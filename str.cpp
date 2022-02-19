@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
@@ -54,4 +56,11 @@ std::string myformat(const char *const fmt, ...)
 	free(buffer);
 
 	return result;
+}
+
+std::string str_tolower(std::string s)
+{
+	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+
+	return s;
 }

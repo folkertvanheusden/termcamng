@@ -15,6 +15,7 @@
 #include "picio.h"
 #include "proc.h"
 #include "terminal.h"
+#include "yaml-helpers.h"
 
 
 ssize_t WRITE(int fd, const uint8_t *whereto, size_t len)
@@ -177,18 +178,26 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 int main(int argc, char *argv[])
 {
-	font f("CP850.F16");
+	std::string cfg_file = "termcamng.yaml";
 
-	const int width       = 80;
-	const int height      = 25;
+	if (argc == 2)
+		cfg_file = argv[1];
 
-	const int tcp_port    = 2300;
-	const int http_port   = 8080;
+	YAML::Node config = YAML::LoadFile(cfg_file);
+
+	std::string font_file = yaml_get_string(config, "font-file", "MS-DOS 8x16 console bitmap font-file");
+	font f(font_file);
+
+	const int width       = yaml_get_int(config, "width",  "terminal console width (e.g. 80)");
+	const int height      = yaml_get_int(config, "height", "terminal console height (e.g. 25)");
+
+	const int tcp_port    = yaml_get_int(config, "telnet-port", "telnet port to listen on");
+	const int http_port   = yaml_get_int(config, "http-port",   "HTTP port to serve PNG rendering of terminal");
 
 	terminal t(&f, width, height);
 
-	std::string command   = "/usr/bin/irssi -c oftc";
-	std::string directory = "/tmp";
+	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
+	std::string directory = yaml_get_string(config, "directory",    "path to chdir for");
 
 	std::thread thread_handle([&t, command, directory, width, height, tcp_port] { process_program(&t, command, directory, width, height, tcp_port); });
 
