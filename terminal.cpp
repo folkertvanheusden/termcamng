@@ -292,13 +292,13 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 			int  offset      = cy * w + cx;
 			char c           = screen[offset].c;
 
-			int color_offset = screen[offset].attr & A_BOLD;
+			int color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
+
+			rgb_t fg         = color_map[color_offset][screen[offset].fg_col_ansi];
+			rgb_t bg         = color_map[color_offset][screen[offset].bg_col_ansi];
 
 			if (screen[offset].attr & A_INVERSE)
-				color_offset = 1 - color_offset;
-
-			rgb_t fg         = color_map[screen[offset].attr & A_BOLD][screen[offset].fg_col_ansi];
-			rgb_t bg         = color_map[screen[offset].attr & A_BOLD][screen[offset].bg_col_ansi];
+				std::swap(fg, bg);
 
 			if (c > 0 && c < 128) {
 				const uint8_t *const char_bitmap = f->get_char_pointer(c);
