@@ -45,7 +45,7 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
                         error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
 
                 close(2);
-                int stderr_fd = open("/dev/null", O_WRONLY);
+                (void)open("/dev/null", O_WRONLY);
 
                 // TODO: a smarter way?
                 int fd_max = sysconf(_SC_OPEN_MAX);
