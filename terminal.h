@@ -42,6 +42,11 @@ public:
 	terminal(font *const f, const int w, const int h);
 	virtual ~terminal();
 
+	int  get_width()  const { return w; };
+	int  get_height() const { return h; };
+
+	char get_char_at(const int x, const int y) const;
+
 	void delete_line(const int y);
 	void insert_line(const int y);
 

@@ -341,3 +341,10 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 	*out_w = pixels_per_row;
 	*out_h = h * char_h;
 }
+
+char terminal::get_char_at(const int cx, const int cy) const
+{
+	int offset = cy * w + cx;
+
+	return screen[offset].c;
+}
