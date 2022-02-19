@@ -5,9 +5,9 @@
 #include "terminal.h"
 
 
-terminal::terminal(const int w, const int h) :
-	w(w),
-	h(h)
+terminal::terminal(font *const f, const int w, const int h) :
+	f(f),
+	w(w), h(h)
 {
 	screen = new pos_t[w * h]();
 }
@@ -66,9 +66,12 @@ void terminal::process_input(const std::string & in)
 
 void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 {
-	*out = reinterpret_cast<uint8_t *>(calloc(1, w * 8 * h * 8 * 3));
+	constexpr const int char_w = 8;
+	constexpr const int char_h = 16;
 
-	int pixels_per_row = w * 8;
+	*out = reinterpret_cast<uint8_t *>(calloc(1, w * char_w * h * char_h * 3));
+
+	int pixels_per_row = w * char_w;
 	int bytes_per_row  = pixels_per_row * 3;
 
 	for(int cy=0; cy<h; cy++) {
@@ -76,13 +79,19 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 			char c = screen[cy * w + cx].c;
 
 			if (c > 0 && c < 128) {
-				for(int py=0; py<8; py++) {
-					for(int px=0; px<8; px++) {
-						int offset = cy * bytes_per_row * 8 + py * bytes_per_row + cx * 8 * 3 + px * 3;
+				const uint8_t *const char_bitmap = f->get_char_pointer(c);
 
-						(*out)[offset + 0] = font_8x8[c][py][px];
-						(*out)[offset + 1] = font_8x8[c][py][px];
-						(*out)[offset + 2] = font_8x8[c][py][px];
+				for(int py=0; py<16; py++) {
+					uint8_t scanline = char_bitmap[py];
+
+					for(int px=0; px<8; px++) {
+						int  offset = cy * bytes_per_row * char_h + py * bytes_per_row + cx * char_w * 3 + px * 3;
+
+						bool bit    = !!(scanline & (1 << (7 - px)));
+
+						(*out)[offset + 0] = bit * 255;
+						(*out)[offset + 1] = bit * 255;
+						(*out)[offset + 2] = bit * 255;
 					}
 				}
 			}
@@ -90,5 +99,5 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 	}
 
 	*out_w = pixels_per_row;
-	*out_h = h * 8;
+	*out_h = h * char_h;
 }

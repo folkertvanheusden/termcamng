@@ -13,14 +13,15 @@ typedef struct {
 
 class terminal {
 private:
-	const int  w { 80 };
-	const int  h { 25 };
-	pos_t     *screen { nullptr };
-	int        x { 0 };
-	int        y { 0 };
+	font      *const f { nullptr };
+	const int        w { 80 };
+	const int        h { 25 };
+	pos_t           *screen { nullptr };
+	int              x { 0 };
+	int              y { 0 };
 
 public:
-	terminal(const int w, const int h);
+	terminal(font *const f, const int w, const int h);
 	virtual ~terminal();
 
 	void delete_line(const int y);

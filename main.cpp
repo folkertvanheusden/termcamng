@@ -8,7 +8,9 @@
 
 int main(int argc, char *argv[])
 {
-	terminal t(80, 25);
+	font f("t/FONTS/SYSTEM/FREEDOS/CPIDOS30/CP850.F16");
+
+	terminal t(&f, 80, 25);
 
 	t.process_input("Hallo,\r\nDit is een test.\r\n\r\n");
 	t.process_input("Hallo,\r\nDit is een test.\r\n\r\n");
