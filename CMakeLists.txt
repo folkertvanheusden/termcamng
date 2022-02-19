@@ -34,4 +34,9 @@ target_link_libraries(termcamng ${LIBPNG_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${LIBPNG_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${LIBPNG_CFLAGS_OTHER})
 
+pkg_check_modules(LIBMICROHTTPD REQUIRED libmicrohttpd)
+target_link_libraries(termcamng ${LIBMICROHTTPD_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${LIBMICROHTTPD_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${LIBMICROHTTPD_CFLAGS_OTHER})
+
 target_link_libraries(termcamng -lutil)

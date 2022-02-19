@@ -1,3 +1,4 @@
+#include <microhttpd.h>
 #include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -140,41 +141,68 @@ void process_program(terminal *const t, const std::string & command, const std::
 	}
 }
 
+MHD_Result get_terminal_png_frame(void *cls,
+		struct MHD_Connection *connection,
+		const char *url,
+		const char *method,
+		const char *version,
+		const char *upload_data, size_t *upload_data_size, void **ptr)
+{
+	terminal *t = reinterpret_cast<terminal *>(cls);
+
+	uint8_t *out = nullptr;
+	int      out_w = 0;
+	int      out_h = 0;
+	t->render(&out, &out_w, &out_h);
+
+	char *data_out = nullptr;
+	size_t data_out_len = 0;
+
+       	FILE *fh = open_memstream(&data_out, &data_out_len);
+
+	write_PNG_file(fh, out_w, out_h, out);
+
+	fclose(fh);
+
+	struct MHD_Response *response = MHD_create_response_from_buffer(data_out_len, data_out, MHD_RESPMEM_MUST_COPY);
+
+	free(data_out);
+
+	MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+
+	MHD_destroy_response (response);
+
+	return ret;
+}
+
 int main(int argc, char *argv[])
 {
-	font f("t/FONTS/SYSTEM/FREEDOS/CPIDOS30/CP850.F16");
+	font f("CP850.F16");
 
-	const int width    = 80;
-	const int height   = 25;
+	const int width       = 80;
+	const int height      = 25;
 
-	const int tcp_port = 2300;
+	const int tcp_port    = 2300;
+	const int http_port   = 8080;
 
 	terminal t(&f, width, height);
 
 	std::string command   = "/usr/bin/irssi -c oftc";
-	// std::string command   = "/usr/bin/httping -K 172.29.0.1";
 	std::string directory = "/tmp";
 
 	std::thread thread_handle([&t, command, directory, width, height, tcp_port] { process_program(&t, command, directory, width, height, tcp_port); });
 
-	for(;;) {
-		sleep(5);
+	struct MHD_Daemon *d = MHD_start_daemon(
+			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
+			http_port,
+			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(&t),
+			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
+			MHD_OPTION_END);
 
-		uint8_t *out = nullptr;
-		int      out_w = 0;
-		int      out_h = 0;
-		t.render(&out, &out_w, &out_h);
+	for(;;)
+		sleep(1);
 
-		printf("%d x %d\n", out_w, out_h);
-
-		FILE *fh = fopen("test.png", "w");
-
-		write_PNG_file(fh, out_w, out_h, out);
-
-		fclose(fh);
-
-		free(out);
-	}
+	MHD_stop_daemon (d);
 
 	return 0;
 }
