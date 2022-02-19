@@ -12,6 +12,23 @@ terminal::terminal(font *const f, const int w, const int h) :
 	w(w), h(h)
 {
 	screen = new pos_t[w * h]();
+
+	color_map[0][0] = {   0,   0,   0 };  // black
+	color_map[0][1] = { 170,   0,   0 };  // red
+	color_map[0][2] = {   0, 170,   0 };  // green
+	color_map[0][3] = { 170,  85,   0 };  // yellow
+	color_map[0][4] = {   0,   0, 170 };  // blue
+	color_map[0][5] = { 170,   0, 170 };  // magenta
+	color_map[0][6] = {   0, 170, 170 };  // cyan
+	color_map[0][7] = { 170, 170, 170 };  // white
+	color_map[1][0] = {  85,  85,  85 };  // bright black (gray)
+	color_map[1][1] = { 255,  85,  85 };  // bright red
+	color_map[1][2] = {  85, 255,  85 };  // bright green
+	color_map[1][3] = { 255, 255,  85 };  // bright yellow
+	color_map[1][4] = {  85,  85, 255 };  // bright blue
+	color_map[1][5] = { 255,  85, 255 };  // bright magenta
+	color_map[1][6] = {  85, 255, 255 };  // bright cyan
+	color_map[1][7] = { 255, 255, 255 };  // bright white
 }
 
 terminal::~terminal()
@@ -99,6 +116,24 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 				x = w - 1;
 		}
 	}
+	else if (cmd == 'm') {
+		for(auto & par : pars) {
+			int par_val = std::atoi(par.c_str());
+
+			if (par_val >= 30 && par_val < 37)  // fg color
+				fg_col_ansi = par_val - 30;
+			else if (par_val >= 40 && par_val < 47)  // bg color
+				bg_col_ansi = par_val - 40;
+			else if (par_val == 0)  // reset
+				fg_col_ansi = bg_col_ansi = attr = 0;
+			else if (par_val == 1)  // bold
+				attr |= A_BOLD;
+			else if (par_val == 2)  // faint
+				attr = attr & ~A_BOLD;
+			else if (par_val == 7)  // inverse video
+				attr ^= A_INVERSE;
+		}
+	}
 	else {
 		printf("Escape ^[[ %s %c not supported\n", parameters.c_str(), cmd);
 	}
@@ -143,7 +178,10 @@ void terminal::process_input(const char *const in, const size_t len)
 		}
 		// "regular" text
 		else {
-			screen[y * w + x].c = in[i];
+			screen[y * w + x].c           = in[i];
+			screen[y * w + x].fg_col_ansi = fg_col_ansi;
+			screen[y * w + x].bg_col_ansi = bg_col_ansi;
+			screen[y * w + x].attr        = attr;
 
 			x++;
 
@@ -178,7 +216,16 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 
 	for(int cy=0; cy<h; cy++) {
 		for(int cx=0; cx<w; cx++) {
-			char c = screen[cy * w + cx].c;
+			int  offset      = cy * w + cx;
+			char c           = screen[offset].c;
+
+			int color_offset = screen[offset].attr & A_BOLD;
+
+			if (screen[offset].attr & A_INVERSE)
+				color_offset = 1 - color_offset;
+
+			rgb_t fg         = color_map[screen[offset].attr & A_BOLD][screen[offset].fg_col_ansi];
+			rgb_t bg         = color_map[screen[offset].attr & A_BOLD][screen[offset].bg_col_ansi];
 
 			if (c > 0 && c < 128) {
 				const uint8_t *const char_bitmap = f->get_char_pointer(c);
@@ -191,9 +238,9 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 
 						bool bit    = !!(scanline & (1 << (7 - px)));
 
-						(*out)[offset + 0] = bit * 255;
-						(*out)[offset + 1] = bit * 255;
-						(*out)[offset + 2] = bit * 255;
+						(*out)[offset + 0] = bit ? fg.r : bg.r;
+						(*out)[offset + 1] = bit ? fg.g : bg.g;
+						(*out)[offset + 2] = bit ? fg.b : bg.b;
 					}
 				}
 			}

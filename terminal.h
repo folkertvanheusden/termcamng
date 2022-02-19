@@ -5,6 +5,9 @@
 #include "font.h"
 
 
+#define A_BOLD    (1 << 0)
+#define A_INVERSE (1 << 1)
+
 typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES, E_END } escape_state_t;
 
 typedef struct {
@@ -12,6 +15,12 @@ typedef struct {
 	int fg_col_ansi, bg_col_ansi;
 	int attr;
 } pos_t;
+
+typedef struct {
+	int r;
+	int g;
+	int b;
+} rgb_t;
 
 class terminal {
 private:
@@ -23,6 +32,10 @@ private:
 	int              y { 0 };
 	escape_state_t   escape_state { E_NONE };
 	std::string      escape_value;
+	int              fg_col_ansi { 37 };
+	int              bg_col_ansi { 40 };
+	int              attr        {  0 };
+	rgb_t            color_map[2][8];
 
 public:
 	terminal(font *const f, const int w, const int h);
