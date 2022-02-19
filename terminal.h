@@ -44,6 +44,8 @@ public:
 	void delete_line(const int y);
 	void insert_line(const int y);
 
+	void insert_character(const int n);
+
 	void process_escape(const char cmd, const std::string & parameters);
 
 	void process_input(const char *const in, const size_t len);

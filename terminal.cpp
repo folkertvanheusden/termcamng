@@ -68,6 +68,16 @@ void terminal::insert_line(const int y)
 	}
 }
 
+void terminal::insert_character(const int n)
+{
+	int n_left      = w - x - 1;
+	int offset_from = y * w + x;
+	int offset_to   = y * w + x + 1;
+
+	for(int i=0; i<n; i++)
+		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
+}
+
 void terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::vector<std::string> pars = split(parameters, ";");
@@ -76,20 +86,36 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 	int                      par2 = pars.size() >= 2 ? std::atoi(pars[1].c_str()) : 1;
 
 	if (cmd == 'A') {  // cursor up
-		if (y)
-			y -= par1;
+		y -= par1;
+
+		if (y < 0)
+			y = 0;
 	}
 	else if (cmd == 'B') {  // cursor down
-		if (y < h - 1)
-			y += par1;
+		y += par1;
+
+		if (y >= h)
+			y = h - 1;
 	}
 	else if (cmd == 'C') {  // cursor forward
-		if (x < w - 1)
-			x += par1;
+		x += par1;
+
+		if (x >= w)
+			x = w - 1;
 	}
 	else if (cmd == 'D') {  // cursor backward
-		if (x)
-			x -= par1;
+		x -= par1;
+
+		if (x < 0)
+			x = 0;
+	}
+	else if (cmd == 'd') {  // set y(?)
+		y = par1 - 1;
+
+		if (y < 0)
+			y = 0;
+		else if (y >= h)
+			y = h - 1;
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
 		x = par1 - 1;
@@ -100,7 +126,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			x = w - 1;
 	}
 	else if (cmd == 'H') {  // set position
-		y = par1;
+		y = par1 - 1;
 
 		if (y < 0)
 			y = 0;
@@ -108,7 +134,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			y = h - 1;
 
 		if (pars.size() >= 2) {
-			x = par2;
+			x = par2 - 1;
 
 			if (x < 0)
 				x = 0;
@@ -116,23 +142,69 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 				x = w - 1;
 		}
 	}
-	else if (cmd == 'm') {
-		for(auto & par : pars) {
-			int par_val = std::atoi(par.c_str());
+	else if (cmd == 'K') {
+		int val = 0;
 
-			if (par_val >= 30 && par_val < 37)  // fg color
-				fg_col_ansi = par_val - 30;
-			else if (par_val >= 40 && par_val < 47)  // bg color
-				bg_col_ansi = par_val - 40;
-			else if (par_val == 0)  // reset
-				fg_col_ansi = bg_col_ansi = attr = 0;
-			else if (par_val == 1)  // bold
-				attr |= A_BOLD;
-			else if (par_val == 2)  // faint
-				attr = attr & ~A_BOLD;
-			else if (par_val == 7)  // inverse video
-				attr ^= A_INVERSE;
+		if (pars.size() >= 1)
+			val = std::atoi(pars[0].c_str());
+
+		int start_x = 0;
+		int end_x   = w;
+
+		if (val == 0)
+			start_x = x;
+		else if (val == 1)
+			end_x   = x;
+		else if (val == 2) {
+			// use defaults
 		}
+
+		for(int cx=start_x; cx<end_x; cx++) {
+			int offset = y * w + cx;
+
+			screen[offset].c           = ' ';
+			screen[offset].fg_col_ansi = fg_col_ansi;
+			screen[offset].bg_col_ansi = bg_col_ansi;
+			screen[offset].attr        = attr;
+		}
+	}
+	else if (cmd == 'M') {
+		for(int i=0; i<par1; i++)
+			delete_line(y);
+	}
+	else if (cmd == 'm') {
+		if (pars.empty())
+			fg_col_ansi = bg_col_ansi = attr = 0;
+		else {
+			for(auto & par : pars) {
+				int par_val = std::atoi(par.c_str());
+
+				if (par_val >= 30 && par_val <= 37)  // fg color
+					fg_col_ansi = par_val - 30;
+				else if (par_val == 39)
+					fg_col_ansi = 7;
+				else if (par_val == 49)
+					bg_col_ansi = 7;
+				else if (par_val >= 40 && par_val <= 47)  // bg color
+					bg_col_ansi = par_val - 40;
+				else if (par_val == 0)  // reset
+					fg_col_ansi = bg_col_ansi = attr = 0;
+				else if (par_val == 1)  // bold
+					attr |= A_BOLD;
+				else if (par_val == 2)  // faint
+					attr = attr & ~A_BOLD;
+				else if (par_val == 7)  // inverse video
+					attr ^= A_INVERSE;
+				else if (par_val == 10) {
+					// default font
+				}
+				else
+					printf("code %d for 'm' not supported\n", par_val);
+			}
+		}
+	}
+	else if (cmd == '@') {  // insert character
+		insert_character(par1);
 	}
 	else {
 		printf("Escape ^[[ %s %c not supported\n", parameters.c_str(), cmd);
@@ -170,7 +242,8 @@ void terminal::process_input(const char *const in, const size_t len)
 
 			escape_value += in[i];
 		}
-		else if (((in[i] >= 'a' && in[i] <= 'z') || (in[i] >= 'A' && in[i] <= 'Z')) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
+		else if ((in[i] >= 0x40 && in[i] <= 0x7e) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
+			printf("GREP %c %s\n", in[i], escape_value.c_str());
 			process_escape(in[i], escape_value);
 
 			escape_state = E_NONE;
