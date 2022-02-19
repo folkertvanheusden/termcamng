@@ -36,6 +36,7 @@ private:
 	int              bg_col_ansi { 40 };
 	int              attr        {  0 };
 	rgb_t            color_map[2][8];
+	char             last_character { ' ' };
 
 public:
 	terminal(font *const f, const int w, const int h);

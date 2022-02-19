@@ -82,35 +82,43 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::vector<std::string> pars = split(parameters, ";");
 
-	int                      par1 = pars.size() >= 1 ? std::atoi(pars[0].c_str()) : 1;
-	int                      par2 = pars.size() >= 2 ? std::atoi(pars[1].c_str()) : 1;
+	int                      par1 = pars.size() >= 1 ? std::atoi(pars[0].c_str()) : 0;
+	int                      par2 = pars.size() >= 2 ? std::atoi(pars[1].c_str()) : 0;
 
 	if (cmd == 'A') {  // cursor up
-		y -= par1;
+		y -= par1 ? : 1;
 
 		if (y < 0)
 			y = 0;
 	}
 	else if (cmd == 'B') {  // cursor down
-		y += par1;
+		y += par1 ? : 1;
 
 		if (y >= h)
 			y = h - 1;
 	}
+	else if (cmd == 'b') { // repeat
+		int n = par1 ? : 1;
+
+		char data[] = { last_character };
+
+		for(int i=0; i<n; i++)
+			process_input(data, sizeof data);
+	}
 	else if (cmd == 'C') {  // cursor forward
-		x += par1;
+		x += par1 ? : 1;
 
 		if (x >= w)
 			x = w - 1;
 	}
 	else if (cmd == 'D') {  // cursor backward
-		x -= par1;
+		x -= par1 ? : 1;
 
 		if (x < 0)
 			x = 0;
 	}
 	else if (cmd == 'd') {  // set y(?)
-		y = par1 - 1;
+		y = par1;
 
 		if (y < 0)
 			y = 0;
@@ -118,7 +126,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			y = h - 1;
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
-		x = par1 - 1;
+		x = par1;
 
 		if (x < 0)
 			x = 0;
@@ -126,7 +134,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			x = w - 1;
 	}
 	else if (cmd == 'H') {  // set position
-		y = par1 - 1;
+		y = par1 ? par1 - 1 : 0;
 
 		if (y < 0)
 			y = 0;
@@ -134,7 +142,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			y = h - 1;
 
 		if (pars.size() >= 2) {
-			x = par2 - 1;
+			x = par2 ? par2 - 1 : 0;
 
 			if (x < 0)
 				x = 0;
@@ -168,8 +176,12 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			screen[offset].attr        = attr;
 		}
 	}
+	else if (cmd == 'L') {
+		for(int i=0; i<(par1 ? : 1); i++)
+			insert_line(y);
+	}
 	else if (cmd == 'M') {
-		for(int i=0; i<par1; i++)
+		for(int i=0; i<(par1 ? : 1); i++)
 			delete_line(y);
 	}
 	else if (cmd == 'm') {
@@ -204,7 +216,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 		}
 	}
 	else if (cmd == '@') {  // insert character
-		insert_character(par1);
+		insert_character(par1 ? : 1);
 	}
 	else {
 		printf("Escape ^[[ %s %c not supported\n", parameters.c_str(), cmd);
@@ -262,6 +274,8 @@ void terminal::process_input(const char *const in, const size_t len)
 				x = 0;
 				y++;
 			}
+
+			last_character = in[i];
 		}
 
 		if (y == h) {
