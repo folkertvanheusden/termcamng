@@ -8,7 +8,7 @@
 #define A_BOLD    (1 << 0)
 #define A_INVERSE (1 << 1)
 
-typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES, E_END } escape_state_t;
+typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
 
 typedef struct {
 	char c;
