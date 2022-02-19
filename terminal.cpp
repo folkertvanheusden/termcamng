@@ -225,6 +225,8 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 
 void terminal::process_input(const char *const in, const size_t len)
 {
+	printf("%s", std::string(in, len).c_str());
+
 	for(size_t i=0; i<len; i++) {
 		if (in[i] == 13)  // carriage return
 			x = 0;
@@ -255,7 +257,6 @@ void terminal::process_input(const char *const in, const size_t len)
 			escape_value += in[i];
 		}
 		else if ((in[i] >= 0x40 && in[i] <= 0x7e) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
-			printf("GREP %c %s\n", in[i], escape_value.c_str());
 			process_escape(in[i], escape_value);
 
 			escape_state = E_NONE;

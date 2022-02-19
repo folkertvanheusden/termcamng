@@ -1,8 +1,11 @@
 #include <fcntl.h>
+#include <pty.h>
+#include <stdlib.h>
 #include <string>
 #include <tuple>
 #include <unistd.h>
 #include <vector>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -11,30 +14,38 @@
 
 
 // this code needs more error checking TODO
-std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir)
+std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height)
 {
-        int pipe_to_proc[2], pipe_from_proc[2];
+	int fd_master { -1 };
 
-        if (pipe(pipe_to_proc) == -1 || pipe(pipe_from_proc) == -1)
-		error_exit(true, "exec_with_pipe: pipe() failed");
+	struct winsize terminal_dimensions { 0 };
+	terminal_dimensions.ws_col = width;
+	terminal_dimensions.ws_row = height;
 
-        pid_t pid = fork();
+	pid_t pid = forkpty(&fd_master, nullptr, nullptr, &terminal_dimensions);
+	if (pid == -1)
+		error_exit(true, "exec_with_pipe: forkptry failed");
+
         if (pid == 0) {
                 setsid();
+
+		std::string columns = myformat("%d", width);
+		std::string lines   = myformat("%d", height);
+
+		if (setenv("COLUMNS", columns.c_str(), 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(COLUMNS) failed");
+
+		if (setenv("LINES", lines.c_str(), 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(LINES) failed");
+
+		if (setenv("TERM", "ansi", 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(TERM) failed");
 
                 if (dir.empty() == false && chdir(dir.c_str()) == -1)
                         error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
 
-                close(0);
-
-                dup(pipe_to_proc[0]);
-                close(pipe_to_proc[1]);
-                close(1);
                 close(2);
-                dup(pipe_from_proc[1]);
-
-                int stderr = open("/dev/null", O_WRONLY);
-                close(pipe_from_proc[0]);
+                int stderr_fd = open("/dev/null", O_WRONLY);
 
                 // TODO: a smarter way?
                 int fd_max = sysconf(_SC_OPEN_MAX);
@@ -53,10 +64,7 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
                         error_exit(true, "Failed to invoke %s", command.c_str());
         }
 
-        close(pipe_to_proc[0]);
-        close(pipe_from_proc[1]); 
-
-        std::tuple<pid_t, int, int> out(pid, pipe_to_proc[1], pipe_from_proc[0]);
+        std::tuple<pid_t, int, int> out(pid, fd_master, fd_master);
 
         return out;
 }

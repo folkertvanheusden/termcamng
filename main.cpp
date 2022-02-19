@@ -9,9 +9,9 @@
 #include "terminal.h"
 
 
-void process_program(terminal *const t)
+void process_program(terminal *const t, const std::string & command, const std::string & directory, const int width, const int height)
 {
-	auto proc = exec_with_pipe("/usr/bin/httping -K 172.29.0.1", "/tmp");
+	auto proc = exec_with_pipe(command, directory, width, height);
 
         pid_t pid  = std::get<0>(proc);
         int   w_fd = std::get<1>(proc);
@@ -36,9 +36,16 @@ int main(int argc, char *argv[])
 {
 	font f("t/FONTS/SYSTEM/FREEDOS/CPIDOS30/CP850.F16");
 
-	terminal t(&f, 80, 25);
+	const int width  = 80;
+	const int height = 25;
 
-	std::thread thread_handle([&t] { process_program(&t); });
+	terminal t(&f, width, height);
+
+	// auto proc = exec_with_pipe("/usr/bin/httping -K 172.29.0.1", "/tmp", 80, 25);
+	std::string command   = "/usr/bin/irssi -c oftc";
+	std::string directory = "/tmp";
+
+	std::thread thread_handle([&t, command, directory, width, height] { process_program(&t, command, directory, width, height); });
 
 	sleep(5);
 

@@ -1,5 +1,9 @@
+#include <stdarg.h>
+#include <stdio.h>
 #include <string>
 #include <vector>
+
+#include "error.h"
 
 
 std::vector<std::string> split(const std::string & in_in, const std::string & splitter)
@@ -32,4 +36,22 @@ std::vector<std::string> split(const std::string & in_in, const std::string & sp
 		out.push_back(in);
 
 	return out;
+}
+
+std::string myformat(const char *const fmt, ...)
+{
+	char *buffer = nullptr;
+        va_list ap;
+
+        va_start(ap, fmt);
+
+        if (vasprintf(&buffer, fmt, ap) == -1)
+		error_exit(true, "myformat: failed to convert string with format \"%s\"", fmt);
+
+        va_end(ap);
+
+	std::string result = buffer;
+	free(buffer);
+
+	return result;
 }
