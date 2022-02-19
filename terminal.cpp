@@ -19,8 +19,8 @@ terminal::~terminal()
 
 void terminal::delete_line(const int y)
 {
-	int offset_to    = y * w;
-	int offset_from  = (y + 1) * w;
+	int offset_to   = y * w;
+	int offset_from = (y + 1) * w;
 
 	int n_characters_to_move = w * h - offset_from;
 
@@ -29,7 +29,23 @@ void terminal::delete_line(const int y)
 			screen[y * w + cx].c = ' ';
 	}
 	else {
-		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move);
+		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
+	}
+}
+
+void terminal::insert_line(const int y)
+{
+	int offset_to    = (y + 1) * w;
+	int offset_from  = y * w;
+
+	int n_characters_to_move = w * h - offset_to;
+
+	if (n_characters_to_move == 0) {
+		for(int cx = 0; cx<w; cx++)
+			screen[y * w + cx].c = ' ';
+	}
+	else {
+		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
 	}
 }
 
@@ -39,6 +55,7 @@ void terminal::process_input(const char *const in, const size_t len)
 		if (in[i] == 13)
 			x = 0;
 		else if (in[i] == 10)
+
 			y++;
 		else {
 			screen[y * w + x].c = in[i];

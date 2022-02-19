@@ -25,6 +25,7 @@ public:
 	virtual ~terminal();
 
 	void delete_line(const int y);
+	void insert_line(const int y);
 
 	void process_input(const char *const in, const size_t len);
 	void process_input(const std::string & in);
