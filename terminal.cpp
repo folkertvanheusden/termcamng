@@ -55,34 +55,43 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::vector<std::string> pars = split(parameters, ";");
 
+	int                      par1 = pars.size() >= 1 ? std::atoi(pars[0].c_str()) : 1;
+	int                      par2 = pars.size() >= 2 ? std::atoi(pars[1].c_str()) : 1;
+
 	if (cmd == 'A') {  // cursor up
 		if (y)
-			y--;
+			y -= par1;
 	}
 	else if (cmd == 'B') {  // cursor down
 		if (y < h - 1)
-			y++;
+			y += par1;
 	}
 	else if (cmd == 'C') {  // cursor forward
 		if (x < w - 1)
-			x++;
+			x += par1;
 	}
 	else if (cmd == 'D') {  // cursor backward
 		if (x)
-			x--;
+			x -= par1;
+	}
+	else if (cmd == 'G') {  // cursor horizontal absolute
+		x = par1 - 1;
+
+		if (x < 0)
+			x = 0;
+		else if (x >= w)
+			x = w - 1;
 	}
 	else if (cmd == 'H') {  // set position
-		if (pars.size() >= 1) {
-			y = std::atoi(pars[0].c_str()) - 1;
+		y = par1;
 
-			if (y < 0)
-				y = 0;
-			else if (y >= h)
-				y = h - 1;
-		}
+		if (y < 0)
+			y = 0;
+		else if (y >= h)
+			y = h - 1;
 
 		if (pars.size() >= 2) {
-			x = std::atoi(pars[0].c_str()) - 1;
+			x = par2;
 
 			if (x < 0)
 				x = 0;
@@ -91,7 +100,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 		}
 	}
 	else {
-		printf("Escape ^[[%s%c not supported\n", parameters.c_str(), cmd);
+		printf("Escape ^[[ %s %c not supported\n", parameters.c_str(), cmd);
 	}
 }
 
@@ -127,8 +136,6 @@ void terminal::process_input(const char *const in, const size_t len)
 			escape_value += in[i];
 		}
 		else if (((in[i] >= 'a' && in[i] <= 'z') || (in[i] >= 'A' && in[i] <= 'Z')) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
-			printf("escape: %s%c\n", escape_value.c_str(), in[i]);
-
 			process_escape(in[i], escape_value);
 
 			escape_state = E_NONE;
