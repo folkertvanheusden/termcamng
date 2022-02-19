@@ -17,7 +17,8 @@ int main(int argc, char *argv[])
 	t.process_input("Hallo,\r\nDit is een test.\r\n\r\n");
 	t.process_input("Hallo,\r\nDit is een test.\r\n\r\n");
 	t.process_input("Hallo,\r\nDit is een test.\r\n\r\n");
-	t.process_input("A");
+	t.process_input("\33[11;13mA\r\n");
+	t.process_input("\33[pB\r\n");
 
 	uint8_t *out = nullptr;
 	int      out_w = 0;

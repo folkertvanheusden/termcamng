@@ -1,7 +1,9 @@
 #include <cstring>
 #include <stdlib.h>
 #include <string>
+#include <vector>
 
+#include "str.h"
 #include "terminal.h"
 
 
@@ -49,14 +51,90 @@ void terminal::insert_line(const int y)
 	}
 }
 
+void terminal::process_escape(const char cmd, const std::string & parameters)
+{
+	std::vector<std::string> pars = split(parameters, ";");
+
+	if (cmd == 'A') {  // cursor up
+		if (y)
+			y--;
+	}
+	else if (cmd == 'B') {  // cursor down
+		if (y < h - 1)
+			y++;
+	}
+	else if (cmd == 'C') {  // cursor forward
+		if (x < w - 1)
+			x++;
+	}
+	else if (cmd == 'D') {  // cursor backward
+		if (x)
+			x--;
+	}
+	else if (cmd == 'H') {  // set position
+		if (pars.size() >= 1) {
+			y = std::atoi(pars[0].c_str()) - 1;
+
+			if (y < 0)
+				y = 0;
+			else if (y >= h)
+				y = h - 1;
+		}
+
+		if (pars.size() >= 2) {
+			x = std::atoi(pars[0].c_str()) - 1;
+
+			if (x < 0)
+				x = 0;
+			else if (x >= w)
+				x = w - 1;
+		}
+	}
+	else {
+		printf("Escape ^[[%s%c not supported\n", parameters.c_str(), cmd);
+	}
+}
+
 void terminal::process_input(const char *const in, const size_t len)
 {
 	for(size_t i=0; i<len; i++) {
-		if (in[i] == 13)
+		if (in[i] == 13)  // carriage return
 			x = 0;
-		else if (in[i] == 10)
-
+		else if (in[i] == 10)  // new line
 			y++;
+		else if (in[i] == 8) {  // backspace
+			if (x)
+				x--;
+			else if (y)
+				x = 0, y--;
+		}
+		else if (in[i] == 9) {  // tab
+			x &= ~7;
+			x += 8;
+
+			if (x >= w)
+				x -= w, y++;
+		}
+		// ANSI escape handling
+		else if (in[i] == 27 && escape_state == E_NONE)
+			escape_state = E_ESC;
+		else if (in[i] == '[' && escape_state == E_ESC)
+			escape_state = E_BRACKET;
+		else if (((in[i] >= '0' && in[i] <= '9') || in[i] == ';') && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
+			if (escape_state == E_BRACKET)
+				escape_state = E_VALUES;
+
+			escape_value += in[i];
+		}
+		else if (((in[i] >= 'a' && in[i] <= 'z') || (in[i] >= 'A' && in[i] <= 'Z')) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
+			printf("escape: %s%c\n", escape_value.c_str(), in[i]);
+
+			process_escape(in[i], escape_value);
+
+			escape_state = E_NONE;
+			escape_value.clear();
+		}
+		// "regular" text
 		else {
 			screen[y * w + x].c = in[i];
 
