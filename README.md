@@ -32,6 +32,11 @@ Run 'termcamng' with an optional path to a yaml-file containing the
 configuration. See termcamng.yaml included for an example.
 
 
+files
+-----
+
+CP850.F16 comes from https://github.com/viler-int10h/vga-text-mode-fonts/releases/download/2020-11-25/VGAfonts-20-11-25-NO-previews.zip
+
 
 Written by Folkert van Heusden <mail@vanheusden.com>
 
