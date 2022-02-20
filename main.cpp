@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <microhttpd.h>
 #include <poll.h>
 #include <stdint.h>
@@ -108,6 +109,10 @@ void process_program(terminal *const t, const std::string & command, const std::
 
 	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { r_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
 
+	bool  telnet_recv = false;
+	int   telnet_left = 0;
+	bool  telnet_sb   = false;
+
 	for(;;) {
 		int rc = poll(fds, client_fd != -1 ? 3 : 2, 500);
 
@@ -118,8 +123,13 @@ void process_program(terminal *const t, const std::string & command, const std::
 			error_exit(true, "process_program: poll failed");
 
 		if (fds[0].revents) {
-			if (client_fd != -1)
+			if (client_fd != -1) {
 				close(client_fd);
+
+				telnet_recv = false;
+				telnet_left = 0;
+				telnet_sb   = false;
+			}
 
 			client_fd = accept(listen_fd, nullptr, nullptr);
 			fds[2].fd = client_fd;
@@ -155,9 +165,38 @@ void process_program(terminal *const t, const std::string & command, const std::
 				close(client_fd);
 				client_fd = -1;
 			}
-			else if (WRITE(w_fd, reinterpret_cast<const uint8_t *>(buffer), rc) != rc) {
-				close(client_fd);
-				client_fd = -1;
+			else {
+				for(int i=0; i<rc; i++) {
+					uint8_t c = buffer[i];
+
+					if (telnet_left > 0 && telnet_sb == false) {
+						if (c == 250)  // SB
+							telnet_sb = true;
+
+						telnet_left--;
+
+						continue;
+					}
+
+					if (telnet_sb) {
+						if (c == 240)  // SE
+							telnet_sb = false;
+
+						continue;
+					}
+
+					if (c == 0xff) {
+						telnet_recv = true;
+						telnet_left = 2;
+					}
+					else if (WRITE(w_fd, &c, 1) != 1) {
+						assert(telnet_recv == false);
+						assert(telnet_left == 0);
+
+						close(client_fd);
+						client_fd = -1;
+					}
+				}
 			}
 		}
 	}
