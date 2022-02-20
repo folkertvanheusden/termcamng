@@ -18,6 +18,7 @@
 #include "io.h"
 #include "picio.h"
 #include "proc.h"
+#include "str.h"
 #include "terminal.h"
 #include "yaml-helpers.h"
 
@@ -34,15 +35,28 @@ void send_initial_screen(const int client_fd, terminal *const t)
 	// clear_screen, go_to 1,1
 	WRITE(client_fd, reinterpret_cast<const uint8_t *>("\033[2J\033[H"), 7);
 
-	for(int y=0; y<t->get_height(); y++) {
-		for(int x=0; x<t->get_width(); x++) {
+	int w = t->get_width();
+	int h = t->get_height();
+
+	for(int y=0; y<h; y++) {
+		bool last_line = y == h - 1;
+
+		int  cur_w     = last_line ? w - 1 : w;
+
+		for(int x=0; x<cur_w; x++) {
 			uint8_t c = t->get_char_at(x, y);
 
 			WRITE(client_fd, &c, 1);
 		}
 
-		WRITE(client_fd, reinterpret_cast<const uint8_t *>("\r\n"), 2);
+		if (!last_line)
+			WRITE(client_fd, reinterpret_cast<const uint8_t *>("\r\n"), 2);
 	}
+
+	auto cursor_location = t->get_current_xy();
+
+	std::string put_cursor = myformat("\033[%d;%dH", cursor_location.second + 1, cursor_location.first + 1);
+	WRITE(client_fd, reinterpret_cast<const uint8_t *>(put_cursor.c_str()), put_cursor.size());
 }
 
 void setup_telnet_session(const int client_fd)

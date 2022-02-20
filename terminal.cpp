@@ -36,6 +36,11 @@ terminal::~terminal()
 	delete [] screen;
 }
 
+std::pair<int, int> terminal::get_current_xy()
+{
+	return { x, y };
+}
+
 void terminal::delete_line(const int y)
 {
 	int offset_to   = y * w;

@@ -45,6 +45,8 @@ public:
 	int  get_width()  const { return w; };
 	int  get_height() const { return h; };
 
+	std::pair<int, int> get_current_xy();
+
 	char get_char_at(const int x, const int y) const;
 
 	void delete_line(const int y);
