@@ -51,8 +51,27 @@ void send_initial_screen(const int client_fd, terminal *const t)
 			WRITE(client_fd, &c, 1);
 		}
 
-		WRITE(client_fd, reinterpret_cast<const uint8_t *>("\n"), 1);
+		WRITE(client_fd, reinterpret_cast<const uint8_t *>("\r\n"), 2);
 	}
+}
+
+void setup_telnet_session(const int client_fd)
+{
+	uint8_t dont_auth[]        = { 0xff, 0xf4, 0x25 };
+	uint8_t suppress_goahead[] = { 0xff, 0xfb, 0x03 };
+	uint8_t dont_linemode[]    = { 0xff, 0xfe, 0x22 };
+	uint8_t dont_new_env[]     = { 0xff, 0xfe, 0x27 };
+	uint8_t will_echo[]        = { 0xff, 0xfb, 0x01 };
+	uint8_t dont_echo[]        = { 0xff, 0xfe, 0x01 };
+	uint8_t noecho[]           = { 0xff, 0xfd, 0x2d };
+
+	WRITE(client_fd, dont_auth, 3);
+	WRITE(client_fd, suppress_goahead, 3);
+	WRITE(client_fd, dont_linemode, 3);
+	WRITE(client_fd, dont_new_env, 3);
+	WRITE(client_fd, will_echo, 3);
+	WRITE(client_fd, dont_echo, 3);
+	WRITE(client_fd, noecho, 3);
 }
 
 void process_program(terminal *const t, const std::string & command, const std::string & directory, const int width, const int height, const int listen_port)
@@ -104,6 +123,8 @@ void process_program(terminal *const t, const std::string & command, const std::
 
 			client_fd = accept(listen_fd, nullptr, nullptr);
 			fds[2].fd = client_fd;
+
+			setup_telnet_session(client_fd);
 
 			send_initial_screen(client_fd, t);
 		}
