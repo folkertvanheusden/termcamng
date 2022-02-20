@@ -1,6 +1,8 @@
 #include <assert.h>
+#include <atomic>
 #include <microhttpd.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +21,13 @@
 #include "terminal.h"
 #include "yaml-helpers.h"
 
+
+std::atomic_bool stop { false };
+
+void signal_handler(int sig)
+{
+	stop = true;
+}
 
 void send_initial_screen(const int client_fd, terminal *const t)
 {
@@ -93,7 +102,7 @@ void process_program(terminal *const t, const std::string & command, const std::
 	int   telnet_left = 0;
 	bool  telnet_sb   = false;
 
-	for(;;) {
+	while(!stop) {
 		int rc = poll(fds, client_fd != -1 ? 3 : 2, 500);
 
 		if (rc == 0)
@@ -205,6 +214,8 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 	fclose(fh);
 
+	free(out);
+
 	struct MHD_Response *response = MHD_create_response_from_buffer(data_out_len, data_out, MHD_RESPMEM_MUST_COPY);
 
 	free(data_out);
@@ -234,6 +245,8 @@ int main(int argc, char *argv[])
 	const int tcp_port    = yaml_get_int(config, "telnet-port", "telnet port to listen on");
 	const int http_port   = yaml_get_int(config, "http-port",   "HTTP port to serve PNG rendering of terminal");
 
+	signal(SIGINT, signal_handler);
+
 	terminal t(&f, width, height);
 
 	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
@@ -248,8 +261,10 @@ int main(int argc, char *argv[])
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 			MHD_OPTION_END);
 
-	for(;;)
+	while(!stop)
 		sleep(1);
+
+	thread_handle.join();
 
 	MHD_stop_daemon (d);
 
