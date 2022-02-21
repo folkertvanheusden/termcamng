@@ -103,17 +103,8 @@ typedef struct
 
 void process_ssh(terminal *const t, const std::string & ssh_keys, const int port, const int program_fd, clients_t *const clients)
 {
-	// only 1 ssh user concurrently currently
-	std::unique_lock<std::mutex> lck(clients->lock);
-
-	client_t *client = new client_t();
-	auto it_client = clients->clients.insert({ "_ssh_", client });
-
-	lck.unlock();
-
 	// setup ssh server
 	ssh_bind sshbind = ssh_bind_new();
-	ssh_session session = ssh_new();
 
 	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, myformat("%s/ssh_host_rsa_key", ssh_keys.c_str()).c_str());
 
@@ -126,10 +117,13 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 		bool err = false;
 
 		// wait for client
+		ssh_session session = ssh_new();
+
 		int r = ssh_bind_accept(sshbind, session);  // TODO unblock
 		if (r == SSH_ERROR) {
 			printf("error accepting a connection: %s\n", ssh_get_error(sshbind));
 			ssh_disconnect(session);
+			ssh_free(session);
 			continue;
 		}
 
@@ -137,10 +131,12 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 		if (ssh_handle_key_exchange(session)) {
 			printf("ssh_handle_key_exchange: %s\n", ssh_get_error(session));
 			ssh_disconnect(session);
+			ssh_free(session);
 			continue;
 		}
 
-		bool auth_success = false;
+		bool        auth_success = false;
+		std::string username;
 
 		while(!stop && !auth_success) {
 			ssh_message message = ssh_message_get(session);
@@ -153,9 +149,12 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 				const char *requested_user = ssh_message_auth_user(message);
 				printf("User \"%s\" requested SSH access\n", requested_user);
 
+				// TODO: check against PAM
 				if (strcmp(requested_user, "user") == 0 && strcmp(ssh_message_auth_password(message), "pass") == 0) {
 					printf("Access granted!\n");
 					auth_success = true;
+
+					username = requested_user;
 
 					ssh_message_auth_reply_success(message, 0);
 
@@ -173,6 +172,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 
 		if (!auth_success) {
 			ssh_disconnect(session);
+			ssh_free(session);
 			break;
 		}
 
@@ -203,6 +203,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 		if (err) {
 			printf("err\n");
 			ssh_disconnect(session);
+			ssh_free(session);
 			continue;
 		}
 
@@ -223,44 +224,68 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 			ssh_message_free(message);
 		}
 
-		printf("Starting \"shell\"\n");
+		std::thread client_thread([session, username, channel, clients, t, program_fd] {
+			printf("Starting \"shell\"\n");
 
-		std::string setup   = setup_telnet_session();
+			// only 1 ssh user with a specific username concurrently currently
+			std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
 
-		std::string data    = generate_initial_screen(t);
+			std::unique_lock<std::mutex> lck(clients->lock);
 
-		std::string initial = setup + data;
-
-		ssh_channel_write(channel, initial.c_str(), initial.size());
-
-		while(!stop && !ssh_channel_is_eof(channel)) {
-			// read from ssh, transmit to terminal
-			char buffer[4096];
-
-			int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
-
-			if (i > 0) {
-				if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
-					break;
-			}
-
-			// transmit any queued traffic
-			std::unique_lock<std::mutex> lck(it_client.first->second->lock);
-			while(!it_client.first->second->queue.empty()) {
-				std::string data = it_client.first->second->queue.at(0);
-
-				it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
-
-				ssh_channel_write(channel, data.c_str(), data.size());
-			}
+			client_t *client = new client_t();
+			auto it_client = clients->clients.insert({ user_key, client });
 
 			lck.unlock();
-		}
 
-		ssh_disconnect(session);
+			std::string setup   = setup_telnet_session();
+
+			std::string data    = generate_initial_screen(t);
+
+			std::string initial = setup + data;
+
+			ssh_channel_write(channel, initial.c_str(), initial.size());
+
+			while(!stop && !ssh_channel_is_eof(channel)) {
+				// read from ssh, transmit to terminal
+				char buffer[4096];
+
+				int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
+
+				if (i > 0) {
+					if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
+						break;
+				}
+
+				// transmit any queued traffic
+				std::unique_lock<std::mutex> lck(it_client.first->second->lock);
+				while(!it_client.first->second->queue.empty()) {
+					std::string data = it_client.first->second->queue.at(0);
+
+					it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
+
+					ssh_channel_write(channel, data.c_str(), data.size());
+				}
+
+				lck.unlock();
+			}
+
+			ssh_disconnect(session);
+			ssh_free(session);
+
+			// unregister client from queues
+			lck.lock();
+
+			clients->clients.erase(user_key);
+
+			delete client;
+		});
+
+		client_thread.detach();
 	}
 
 	ssh_finalize();
+
+	printf("process_ssh: thread terminating\n");
 }
 
 void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, clients_t *const clients)
