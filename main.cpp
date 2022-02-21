@@ -10,6 +10,7 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
@@ -79,7 +80,7 @@ void setup_telnet_session(const int client_fd)
 	WRITE(client_fd, noecho, 3);
 }
 
-void process_program(terminal *const t, const std::string & command, const std::string & directory, const int width, const int height, const int listen_port)
+void process_program(terminal *const t, const std::string & command, const std::string & directory, const int width, const int height, const std::string & bind_to, const int listen_port)
 {
 	auto proc     = exec_with_pipe(command, directory, width, height);
 
@@ -101,6 +102,13 @@ void process_program(terminal *const t, const std::string & command, const std::
         struct sockaddr_in server_addr { 0 };
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(listen_port);
+	int rc = inet_pton(AF_INET, bind_to.c_str(), &server_addr.sin_addr);
+
+	if (rc == 0)
+		error_exit(false, "process_program: \"%s\" is not a valid IP-address", bind_to.c_str());
+
+	if (rc == -1)
+		error_exit(true, "process_program: problem interpreting \"%s\"", bind_to.c_str());
 
         if (bind(listen_fd, (struct sockaddr *)&server_addr, sizeof server_addr) == -1)
                 error_exit(true, "process_program: failed to bind to port %d", listen_port);
@@ -362,11 +370,13 @@ int main(int argc, char *argv[])
 	std::string font_file = yaml_get_string(config, "font-file", "MS-DOS 8x16 console bitmap font-file");
 	font f(font_file);
 
-	const int width       = yaml_get_int(config, "width",  "terminal console width (e.g. 80)");
-	const int height      = yaml_get_int(config, "height", "terminal console height (e.g. 25)");
+	const int width             = yaml_get_int(config,    "width",       "terminal console width (e.g. 80)");
+	const int height            = yaml_get_int(config,    "height",      "terminal console height (e.g. 25)");
 
-	const int tcp_port    = yaml_get_int(config, "telnet-port", "telnet port to listen on");
-	const int http_port   = yaml_get_int(config, "http-port",   "HTTP port to serve PNG rendering of terminal");
+	const std::string bind_addr = yaml_get_string(config, "telnet-addr", "network interface (IP address) to let the telnet port bind to");
+	const int tcp_port          = yaml_get_int(config,    "telnet-port", "telnet port to listen on");
+
+	const int http_port         = yaml_get_int(config,    "http-port",   "HTTP port to serve PNG rendering of terminal");
 
 	signal(SIGINT, signal_handler);
 
@@ -375,7 +385,7 @@ int main(int argc, char *argv[])
 	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
 	std::string directory = yaml_get_string(config, "directory",    "path to chdir for");
 
-	std::thread thread_handle([&t, command, directory, width, height, tcp_port] { process_program(&t, command, directory, width, height, tcp_port); });
+	std::thread thread_handle([&t, command, directory, width, height, bind_addr, tcp_port] { process_program(&t, command, directory, width, height, bind_addr, tcp_port); });
 
 	struct MHD_Daemon *d = MHD_start_daemon(
 			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,

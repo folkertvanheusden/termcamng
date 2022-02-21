@@ -3,7 +3,9 @@ font-file: CP850.F16
 width: 80
 height: 25
 
+telnet-addr: 127.0.0.1
 telnet-port: 2300
+
 http-port: 8080
 
 exec-command: /usr/bin/irssi -c oftc
