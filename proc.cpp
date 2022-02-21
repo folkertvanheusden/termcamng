@@ -24,7 +24,7 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 
 	pid_t pid = forkpty(&fd_master, nullptr, nullptr, &terminal_dimensions);
 	if (pid == -1)
-		error_exit(true, "exec_with_pipe: forkptry failed");
+		error_exit(true, "exec_with_pipe: forkpty failed");
 
         if (pid == 0) {
                 setsid();

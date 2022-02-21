@@ -161,7 +161,7 @@ void process_program(terminal *const t, const std::string & command, const std::
 			}
 		}
 
-		if (fds[2].revents) {
+		if (client_fd != -1 && fds[2].revents) {
 			char buffer[4096];
 			int  rc = read(client_fd, buffer, sizeof buffer);
 
@@ -197,8 +197,13 @@ void process_program(terminal *const t, const std::string & command, const std::
 						assert(telnet_recv == false);
 						assert(telnet_left == 0);
 
-						close(client_fd);
-						client_fd = -1;
+						if (client_fd != -1)  {
+							close(client_fd);
+
+							client_fd = 1;
+						}
+
+						stop = true;  // program went away
 					}
 				}
 			}
@@ -309,11 +314,14 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 		free(png.first);
 
-		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/png");
+		MHD_Result ret = MHD_NO;
 
-		MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/png") == MHD_NO)
+			ret = MHD_NO;
+		else
+			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 
-		MHD_destroy_response (response);
+		MHD_destroy_response(response);
 
 		return ret;
 	}
@@ -327,9 +335,12 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, t->get_width() * t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
 
-		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "multipart/x-mixed-replace; boundary=--12345");
+		MHD_Result ret = MHD_YES;
 
-		MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "multipart/x-mixed-replace; boundary=--12345") == MHD_NO)
+			ret = MHD_NO;
+		else
+			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 
 		MHD_destroy_response(response);
 
