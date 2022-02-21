@@ -8,5 +8,8 @@ telnet-port: 2300
 
 http-port: 8080
 
+ssh-port: 2200
+ssh-keys: /etc/ssh
+
 exec-command: /usr/bin/irssi -c oftc
 directory: /tmp

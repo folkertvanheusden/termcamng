@@ -14,6 +14,7 @@ required
  * libpng-dev
  * libmicrohttpd-dev
  * libyaml-cpp-dev
+ * libssh-dev
 
 
 creating

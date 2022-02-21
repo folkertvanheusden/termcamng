@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <vector>
 #include <arpa/inet.h>
+#include <libssh/libssh.h>
+#include <libssh/server.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
@@ -32,10 +34,12 @@ void signal_handler(int sig)
 	stop = true;
 }
 
-void send_initial_screen(const int client_fd, terminal *const t)
+std::string generate_initial_screen(terminal *const t)
 {
+	std::string out;
+
 	// clear_screen, go_to 1,1
-	WRITE(client_fd, reinterpret_cast<const uint8_t *>("\033[2J\033[H"), 7);
+	out += "\033[2J\033[H";
 
 	int w = t->get_width();
 	int h = t->get_height();
@@ -48,17 +52,18 @@ void send_initial_screen(const int client_fd, terminal *const t)
 		for(int x=0; x<cur_w; x++) {
 			uint8_t c = t->get_char_at(x, y);
 
-			WRITE(client_fd, &c, 1);
+			out += c;
 		}
 
 		if (!last_line)
-			WRITE(client_fd, reinterpret_cast<const uint8_t *>("\r\n"), 2);
+			out += "\r\n";
 	}
 
 	auto cursor_location = t->get_current_xy();
 
-	std::string put_cursor = myformat("\033[%d;%dH", cursor_location.second + 1, cursor_location.first + 1);
-	WRITE(client_fd, reinterpret_cast<const uint8_t *>(put_cursor.c_str()), put_cursor.size());
+	out += myformat("\033[%d;%dH", cursor_location.second + 1, cursor_location.first + 1);
+
+	return out;
 }
 
 void setup_telnet_session(const int client_fd)
@@ -80,10 +85,162 @@ void setup_telnet_session(const int client_fd)
 	WRITE(client_fd, noecho, 3);
 }
 
-void process_program(terminal *const t, const std::string & command, const std::string & directory, const int width, const int height, const std::string & bind_to, const int listen_port)
+void process_ssh(terminal *const t, const std::string & ssh_keys, const int port, const int program_fd)
 {
-	auto proc     = exec_with_pipe(command, directory, width, height);
+	// setup ssh server
+	ssh_bind sshbind = ssh_bind_new();
+	ssh_session session = ssh_new();
 
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, myformat("%s/ssh_host_rsa_key", ssh_keys.c_str()).c_str());
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
+
+	if (ssh_bind_listen(sshbind) < 0)
+		error_exit(false, "process_ssh: error listening to socket: %s", ssh_get_error(sshbind));
+
+	for(;!stop;) {
+		bool err = false;
+
+		// wait for client
+		int r = ssh_bind_accept(sshbind, session);
+		if (r == SSH_ERROR) {
+			printf("error accepting a connection: %s\n", ssh_get_error(sshbind));
+			ssh_disconnect(session);
+			continue;
+		}
+
+		// authenticate
+		if (ssh_handle_key_exchange(session)) {
+			printf("ssh_handle_key_exchange: %s\n", ssh_get_error(session));
+			ssh_disconnect(session);
+			continue;
+		}
+
+		bool auth_success = false;
+
+		while(!stop && !auth_success) {
+			ssh_message message = ssh_message_get(session);
+			if (!message)
+				break;
+
+			ssh_message_auth_set_methods(message, SSH_AUTH_METHOD_PASSWORD);
+
+			if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
+				const char *requested_user = ssh_message_auth_user(message);
+				printf("User \"%s\" requested SSH access\n", requested_user);
+
+				if (strcmp(requested_user, "user") == 0 && strcmp(ssh_message_auth_password(message), "pass") == 0) {
+					printf("Access granted!\n");
+					auth_success = true;
+
+					ssh_message_auth_reply_success(message, 0);
+
+					ssh_message_free(message);
+					break;
+				}
+				
+				printf("Access denied\n");
+			}
+
+			ssh_message_reply_default(message);
+
+			ssh_message_free(message);
+		}
+
+		if (!auth_success) {
+			ssh_disconnect(session);
+			break;
+		}
+
+		// select a channel
+		printf("Wait for channel\n");
+		ssh_channel channel = nullptr;
+		while(!stop && channel == nullptr) {
+			ssh_message message = ssh_message_get(session);
+
+			if (!message) {
+				err = true;
+				break;
+			}
+
+			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL_OPEN) {
+				printf("Received SSH_REQUEST_CHANNEL_OPEN\n");
+
+				if (ssh_message_subtype(message) == SSH_CHANNEL_SESSION) {
+					channel = ssh_message_channel_request_open_reply_accept(message);
+					if (channel)
+						printf("Channel requested (succes)\n");
+				}
+			}
+
+			ssh_message_free(message);
+		}
+
+		if (err) {
+			printf("err\n");
+			ssh_disconnect(session);
+			continue;
+		}
+
+		// wait for shell request
+		printf("Wait for shell request\n");
+		while(!stop) {
+			ssh_message message = ssh_message_get(session);
+			if (!message)
+				break;
+
+			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL && ssh_message_subtype(message) == SSH_CHANNEL_REQUEST_SHELL) {
+				printf("User requested shell\n");
+				ssh_message_channel_request_reply_success(message);
+				ssh_message_free(message);
+				break;
+			}
+
+			ssh_message_free(message);
+		}
+
+		struct pollfd fds[] = { { program_fd, POLLIN, 0 } };
+
+		printf("Starting \"shell\"\n");
+
+		std::string data = generate_initial_screen(t);
+		ssh_channel_write(channel, data.c_str(), data.size());
+
+		while(!stop && !ssh_channel_is_eof(channel)) {
+			// read from ssh, transmit to terminal
+			printf("read from ssh, transmit to terminal\n");
+			char buffer[4096];
+
+			int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
+
+			if (i > 0)
+				WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i);  // TODO check for errors
+
+			// read from program, transmit to ssh & terminal
+			int rc = poll(fds, 1, 50);
+
+			if (rc == 1 && fds[0].revents) {  // TODO check for errors
+				printf("read from program, transmit to ssh & terminal\n");
+				int rc = read(program_fd, buffer, sizeof buffer);  // TODO handle errors
+
+				if (rc > 0) {
+					printf("send %d to terminal\n", rc);
+					t->process_input(buffer, rc);
+
+					printf("send to ssh client\n");
+					ssh_channel_write(channel, buffer, rc);
+				}
+			}
+		}
+
+		ssh_disconnect(session);
+	}
+
+	ssh_finalize();
+}
+
+void process_program(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port)
+{
 	int client_fd = -1;
 
 	// setup listening socket for viewers
@@ -116,10 +273,7 @@ void process_program(terminal *const t, const std::string & command, const std::
         if (listen(listen_fd, q_size) == -1)
                 error_exit(true, "process_program: listen failed");
 
-        int   w_fd = std::get<1>(proc);
-        int   r_fd = std::get<2>(proc);
-
-	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { r_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
+	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { program_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
 
 	bool  telnet_recv = false;
 	int   telnet_left = 0;
@@ -148,12 +302,17 @@ void process_program(terminal *const t, const std::string & command, const std::
 
 			setup_telnet_session(client_fd);
 
-			send_initial_screen(client_fd, t);
+			std::string data = generate_initial_screen(t);
+
+			if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
+				close(client_fd);
+				client_fd = -1;
+			}
 		}
 
 		if (fds[1].revents) {
 			char buffer[4096];
-			int  rc = read(r_fd, buffer, sizeof buffer);
+			int  rc = read(program_fd, buffer, sizeof buffer);
 
 			if (rc == -1)
 				break;
@@ -201,7 +360,7 @@ void process_program(terminal *const t, const std::string & command, const std::
 						telnet_recv = true;
 						telnet_left = 2;
 					}
-					else if (WRITE(w_fd, &c, 1) != 1) {
+					else if (WRITE(program_fd, &c, 1) != 1) {
 						assert(telnet_recv == false);
 						assert(telnet_left == 0);
 
@@ -374,9 +533,12 @@ int main(int argc, char *argv[])
 	const int height            = yaml_get_int(config,    "height",      "terminal console height (e.g. 25)");
 
 	const std::string bind_addr = yaml_get_string(config, "telnet-addr", "network interface (IP address) to let the telnet port bind to");
-	const int tcp_port          = yaml_get_int(config,    "telnet-port", "telnet port to listen on");
+	const int telnet_port       = yaml_get_int(config,    "telnet-port", "telnet port to listen on");
 
 	const int http_port         = yaml_get_int(config,    "http-port",   "HTTP port to serve PNG rendering of terminal");
+
+	const int ssh_port          = yaml_get_int(config,    "ssh-port",    "SSH port for controlling the program");
+	const std::string ssh_keys  = yaml_get_string(config, "ssh-keys",    "directory where the SSH keys are stored");
 
 	signal(SIGINT, signal_handler);
 
@@ -385,7 +547,12 @@ int main(int argc, char *argv[])
 	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
 	std::string directory = yaml_get_string(config, "directory",    "path to chdir for");
 
-	std::thread thread_handle([&t, command, directory, width, height, bind_addr, tcp_port] { process_program(&t, command, directory, width, height, bind_addr, tcp_port); });
+	auto proc             = exec_with_pipe(command, directory, width, height);
+	int  program_fd       = std::get<1>(proc);
+
+//	std::thread telnet_thread_handle([&t, program_fd, width, height, bind_addr, telnet_port] { process_program(&t, program_fd, width, height, bind_addr, telnet_port); });
+
+	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_port] { process_ssh(&t, ssh_keys, ssh_port, program_fd); });
 
 	struct MHD_Daemon *d = MHD_start_daemon(
 			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
@@ -397,7 +564,9 @@ int main(int argc, char *argv[])
 	while(!stop)
 		sleep(1);
 
-	thread_handle.join();
+	ssh_thread_handle.join();
+
+//	telnet_thread_handle.join();
 
 	MHD_stop_daemon (d);
 

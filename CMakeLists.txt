@@ -47,4 +47,9 @@ target_link_libraries(termcamng ${YAML_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${YAML_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${YAML_CFLAGS_OTHER})
 
+pkg_check_modules(LIBSSH REQUIRED libssh)
+target_link_libraries(termcamng ${LIBSSH_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${LIBSSH_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${LIBSSH_CFLAGS_OTHER})
+
 target_link_libraries(termcamng -lutil)
