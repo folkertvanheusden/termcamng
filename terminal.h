@@ -1,4 +1,6 @@
+#include <condition_variable>
 #include <cstddef>
+#include <mutex>
 #include <stdint.h>
 #include <string>
 
@@ -37,6 +39,9 @@ private:
 	int              attr        {  0 };
 	rgb_t            color_map[2][8];
 	char             last_character { ' ' };
+	uint64_t         latest_update { 0 };
+	std::mutex       lock;
+	std::condition_variable cond;
 
 public:
 	terminal(font *const f, const int w, const int h);
@@ -59,5 +64,5 @@ public:
 	void process_input(const char *const in, const size_t len);
 	void process_input(const std::string & in);
 
-	void render(uint8_t **const out, int *const out_w, int *const out_h);
+	void render(uint64_t *const ts_after, uint8_t **const out, int *const out_w, int *const out_h);
 };

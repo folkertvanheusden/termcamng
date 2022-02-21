@@ -5,6 +5,7 @@
 
 #include "str.h"
 #include "terminal.h"
+#include "time.h"
 
 
 terminal::terminal(font *const f, const int w, const int h) :
@@ -293,6 +294,12 @@ void terminal::process_input(const char *const in, const size_t len)
 			y = h - 1;
 		}
 	}
+
+	std::unique_lock<std::mutex> lck(lock);
+
+	latest_update = get_ms();
+
+	cond.notify_all();
 }
 
 void terminal::process_input(const std::string & in)
@@ -300,8 +307,15 @@ void terminal::process_input(const std::string & in)
 	process_input(in.c_str(), in.size());
 }
 
-void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
+void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const out_w, int *const out_h)
 {
+	std::unique_lock<std::mutex> lck(lock);
+
+	while(latest_update <= *ts_after)
+		cond.wait(lck);
+
+	*ts_after = latest_update;
+
 	constexpr const int char_w = 8;
 	constexpr const int char_h = 16;
 

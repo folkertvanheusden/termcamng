@@ -32,6 +32,13 @@ Run 'termcamng' with an optional path to a yaml-file containing the
 configuration. See termcamng.yaml included for an example.
 
 
+http
+----
+
+http://ip-adres/        <-- 1 PNG frame
+http://ip-adres/stream  <-- stream of PNG images
+
+
 files
 -----
 
