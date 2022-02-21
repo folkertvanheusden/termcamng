@@ -252,9 +252,9 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
 
 	if (p->buffer == nullptr) {
-		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\n\r\n");
-
 		auto png = get_png_frame(p->t, &p->buffer_ts);
+
+		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n\r\n", png.second);
 
 		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + png.second));
 		if (!temp)
@@ -359,7 +359,7 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, signal_handler);
 
-	terminal t(&f, width, height);
+	terminal t(&f, width, height, &stop);
 
 	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
 	std::string directory = yaml_get_string(config, "directory",    "path to chdir for");

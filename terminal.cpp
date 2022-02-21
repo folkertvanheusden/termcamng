@@ -8,9 +8,10 @@
 #include "time.h"
 
 
-terminal::terminal(font *const f, const int w, const int h) :
+terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *const stop_flag) :
 	f(f),
-	w(w), h(h)
+	w(w), h(h),
+	stop_flag(stop_flag)
 {
 	screen = new pos_t[w * h]();
 
@@ -311,8 +312,8 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 {
 	std::unique_lock<std::mutex> lck(lock);
 
-	while(latest_update <= *ts_after)
-		cond.wait(lck);
+	while(latest_update <= *ts_after && !*stop_flag)
+		cond.wait_for(lck, std::chrono::milliseconds(500));
 
 	*ts_after = latest_update;
 

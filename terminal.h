@@ -1,3 +1,4 @@
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <mutex>
@@ -26,25 +27,26 @@ typedef struct {
 
 class terminal {
 private:
-	font      *const f { nullptr };
-	const int        w { 80 };
-	const int        h { 25 };
-	pos_t           *screen { nullptr };
-	int              x { 0 };
-	int              y { 0 };
-	escape_state_t   escape_state { E_NONE };
-	std::string      escape_value;
-	int              fg_col_ansi { 37 };
-	int              bg_col_ansi { 40 };
-	int              attr        {  0 };
-	rgb_t            color_map[2][8];
-	char             last_character { ' ' };
-	uint64_t         latest_update { 0 };
-	std::mutex       lock;
+	font       *const f { nullptr };
+	const int         w { 80 };
+	const int         h { 25 };
+	pos_t            *screen { nullptr };
+	int               x { 0 };
+	int               y { 0 };
+	escape_state_t    escape_state { E_NONE };
+	std::string       escape_value;
+	int               fg_col_ansi { 37 };
+	int               bg_col_ansi { 40 };
+	int               attr        {  0 };
+	rgb_t             color_map[2][8];
+	char              last_character { ' ' };
+	uint64_t          latest_update { 0 };
+	std::mutex        lock;
 	std::condition_variable cond;
+	std::atomic_bool *const stop_flag;
 
 public:
-	terminal(font *const f, const int w, const int h);
+	terminal(font *const f, const int w, const int h, std::atomic_bool *const stop_flag);
 	virtual ~terminal();
 
 	int  get_width()  const { return w; };
