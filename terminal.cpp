@@ -234,7 +234,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 				else if (par_val == 39)
 					fg_col_ansi = 7;
 				else if (par_val == 49)
-					bg_col_ansi = 7;
+					bg_col_ansi = 0;
 				else if (par_val >= 40 && par_val <= 47)  // bg color
 					bg_col_ansi = par_val - 40;
 				else if (par_val == 0)  // reset
@@ -245,8 +245,8 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 					attr = attr & ~A_BOLD;
 				else if (par_val == 7)  // inverse video
 					attr ^= A_INVERSE;
-				else if (par_val == 10) {
-					// default font
+				else if (par_val >= 10 && par_val <= 19) {
+					// font selection
 				}
 				else {
 					dolog(ll_info, "code %d for 'm' not supported", par_val);
