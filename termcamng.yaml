@@ -1,12 +1,23 @@
 font-file: CP850.F16
 
+local-output: true
+
+fork: false
+
 width: 80
 height: 25
 
 telnet-addr: 127.0.0.1
+# set to 0 to disable
 telnet-port: 2300
 
 http-port: 8080
+
+ssh-addr: 127.0.0.1
+# set to 0 to disable
+ssh-port: 2200
+#ssh-keys: /etc/ssh
+ssh-keys: keys/
 
 exec-command: /usr/bin/irssi -c oftc
 directory: /tmp
