@@ -158,6 +158,32 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 				x = w - 1;
 		}
 	}
+	else if (cmd == 'J') {
+		int val = 0;
+
+		if (pars.size() >= 1)
+			val = std::atoi(pars[0].c_str());
+
+		int start_pos = 0;
+		int end_pos   = y * w + x;
+
+		if (val == 0)
+			start_pos = y * w + x, end_pos = w * h;
+		else if (val == 1)
+			end_pos++;
+		else if (val == 2 || val == 3) {
+			end_pos = w * h;
+
+			x = y = 0;
+		}
+
+		for(int pos=start_pos; pos<end_pos; pos++) {
+			screen[pos].c           = ' ';
+			screen[pos].fg_col_ansi = fg_col_ansi;
+			screen[pos].bg_col_ansi = bg_col_ansi;
+			screen[pos].attr        = attr;
+		}
+	}
 	else if (cmd == 'K') {
 		int val = 0;
 
@@ -226,6 +252,19 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 					dolog(ll_info, "code %d for 'm' not supported", par_val);
 				}
 			}
+		}
+	}
+	else if (cmd == 'X') {  // erase character
+		int offset = y * w + x;
+
+		if (par1 == 0)
+			par1 = 1;
+
+		for(int i=0; i<par1; i++) {
+			screen[offset + i].c           = ' ';
+			screen[offset + i].fg_col_ansi = fg_col_ansi;
+			screen[offset + i].bg_col_ansi = bg_col_ansi;
+			screen[offset + i].attr        = attr;
 		}
 	}
 	else if (cmd == '@') {  // insert character
