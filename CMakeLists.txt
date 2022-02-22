@@ -23,6 +23,7 @@ add_executable(termcamng
 	str.cpp
 	terminal.cpp
 	time.cpp
+	utils.cpp
 	yaml-helpers.cpp
 	)
 

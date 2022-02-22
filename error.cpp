@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "logging.h"
+
 
 [[ noreturn ]] void error_exit(const bool se, const char *format, ...)
 {
@@ -21,8 +23,13 @@
 
 	fprintf(stderr, "%s\n", temp);
 
-	if (se && e)
+	dolog(ll_error, "%s", temp);
+
+	if (se && e) {
 		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
+
+		dolog(ll_error, "errno: %d (%s)\n", e, strerror(e));
+	}
 
 	free(temp);
 

@@ -60,8 +60,13 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
                         pars[i] = (char *)parts.at(i).c_str();
                 pars[n_args] = nullptr;
 
-                if (execv(pars[0], &pars[0]) == -1)
+                if (execv(pars[0], &pars[0]) == -1) {
+			std::string error = myformat("CANNOT INVOKE \"%s\"!", command.c_str());
+
+			write(fd_master, error.c_str(), error.size());
+
                         error_exit(true, "Failed to invoke %s", command.c_str());
+		}
         }
 
         std::tuple<pid_t, int, int> out(pid, fd_master, fd_master);

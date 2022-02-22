@@ -27,6 +27,7 @@
 #include "proc.h"
 #include "str.h"
 #include "terminal.h"
+#include "utils.h"
 #include "yaml-helpers.h"
 
 
@@ -252,6 +253,8 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 		}
 
 		std::thread client_thread([session, username, channel, clients, t, program_fd] {
+			set_thread_name("ssh-" + username);
+
 			std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
 
 			std::unique_lock<std::mutex> lck(clients->lock);
@@ -354,14 +357,14 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 	lck.unlock();
 
-	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { program_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
+	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
 
 	bool  telnet_recv = false;
 	int   telnet_left = 0;
 	bool  telnet_sb   = false;
 
 	while(!stop) {
-		int rc = poll(fds, client_fd != -1 ? 3 : 2, 100);
+		int rc = poll(fds, client_fd != -1 ? 2 : 1, 100);
 
 		// transmit any queued traffic
 		std::unique_lock<std::mutex> lck(it_client.first->second->lock);
@@ -397,7 +400,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			}
 
 			client_fd = accept(listen_fd, nullptr, nullptr);
-			fds[2].fd = client_fd;
+			fds[1].fd = client_fd;
 
 			std::string setup   = setup_telnet_session();
 
@@ -411,7 +414,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			}
 		}
 
-		if (client_fd != -1 && fds[2].revents) {
+		if (client_fd != -1 && fds[1].revents) {
 			char buffer[4096];
 			int  rc = read(client_fd, buffer, sizeof buffer);
 
@@ -463,6 +466,8 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 void read_and_distribute_program(const int program_fd, terminal *const t, clients_t *const clients, const bool local_output)
 {
+	set_thread_name("program-i/o");
+
 	struct pollfd fds[] = { { program_fd, POLLIN, 0 } };
 
 	while(!stop) {
@@ -478,7 +483,7 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 
 			int rrc = read(program_fd, buffer, sizeof buffer);
 			if (rrc == -1 || rrc == 0) {
-				dolog(ll_warning, "read_and_distribute_program: problem receiving from program%s", rrc ? strerror(errno) : "");
+				dolog(ll_warning, "read_and_distribute_program: problem receiving from program %s", rrc ? strerror(errno) : "");
 				break;
 			}
 
@@ -700,11 +705,15 @@ int main(int argc, char *argv[])
 	std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
 	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, &clients] {
+			set_thread_name("telnet");
+
 			if (telnet_port != 0)
 				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, &clients);
 				});
 
 	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, &clients] {
+			set_thread_name("ssh");
+
 			if (ssh_port != 0)
 				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, &clients);
 				});
