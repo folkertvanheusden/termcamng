@@ -6,6 +6,8 @@ The terminal is rendered to a PNG file which is then served via a http-
 (web-)server.
 You can connect to it using an SSH or telnet program and then interact
 with the program that is running.
+The internal SSH server authenticats via PAM against the local user-
+database of the Linux system.
 
 
 required
