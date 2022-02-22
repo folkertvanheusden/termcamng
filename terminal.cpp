@@ -86,6 +86,16 @@ void terminal::insert_character(const int n)
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
 }
 
+void terminal::erase_character(const int n)
+{
+	int n_left      = w - x;
+	int offset_to   = y * w + x;
+	int offset_from = y * w + x + 1;
+
+	for(int i=0; i<n; i++)
+		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
+}
+
 void terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::vector<std::string> pars = split(parameters, ";");
@@ -266,6 +276,9 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			screen[offset + i].bg_col_ansi = bg_col_ansi;
 			screen[offset + i].attr        = attr;
 		}
+	}
+	else if (cmd == 'P') {  // erase character
+		erase_character(par1 ? par1 : 1);
 	}
 	else if (cmd == '@') {  // insert character
 		insert_character(par1 ? par1 : 1);

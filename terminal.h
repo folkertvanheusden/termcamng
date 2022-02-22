@@ -54,13 +54,14 @@ public:
 
 	std::pair<int, int> get_current_xy();
 
-	char get_char_at(const int x, const int y) const;
+	char  get_char_at(const int x, const int y) const;
 	pos_t get_cell_at(const int x, const int y) const;
 
 	void delete_line(const int y);
 	void insert_line(const int y);
 
 	void insert_character(const int n);
+	void erase_character (const int n);
 
 	void process_escape(const char cmd, const std::string & parameters);
 
