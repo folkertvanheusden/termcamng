@@ -1,5 +1,7 @@
 font-file: CP850.F16
 
+local-output: true
+
 width: 80
 height: 25
 

@@ -461,13 +461,14 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 	}
 }
 
-void read_and_distribute_program(const int program_fd, terminal *const t, clients_t *const clients)
+void read_and_distribute_program(const int program_fd, terminal *const t, clients_t *const clients, const bool local_output)
 {
 	struct pollfd fds[] = { { program_fd, POLLIN, 0 } };
 
 	while(!stop) {
 		int prc = poll(fds, 1, 500);
-		// TODO handle errors
+		if (prc == -1)
+			error_exit(true, "read_and_distribute_program: poll failed");
 
 		if (prc == 0)
 			continue;
@@ -476,12 +477,18 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 			char buffer[4096];
 
 			int rrc = read(program_fd, buffer, sizeof buffer);
-			// TODO handle errors
+			if (rrc == -1 || rrc == 0) {
+				fprintf(stderr, "read_and_distribute_program: problem receiving from program%s\n", rrc ? strerror(errno) : "");
+				break;
+			}
 
 			if (rrc > 0) {
 				t->process_input(buffer, rrc);
 
 				std::string data(buffer, rrc);
+
+				if (local_output)
+					printf("%s", data.c_str());
 
 				std::lock_guard(clients->lock);
 
@@ -646,17 +653,19 @@ int main(int argc, char *argv[])
 	std::string font_file = yaml_get_string(config, "font-file", "MS-DOS 8x16 console bitmap font-file");
 	font f(font_file);
 
-	const int width               = yaml_get_int(config,    "width",       "terminal console width (e.g. 80)");
-	const int height              = yaml_get_int(config,    "height",      "terminal console height (e.g. 25)");
+	const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
+	const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");
 
-	const std::string telnet_bind = yaml_get_string(config, "telnet-addr", "network interface (IP address) to let the telnet port bind to");
-	const int telnet_port         = yaml_get_int(config,    "telnet-port", "telnet port to listen on (0 to disable)");
+	const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
+	const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
 
-	const int http_port           = yaml_get_int(config,    "http-port",   "HTTP port to serve PNG rendering of terminal");
+	const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
 
-	const int ssh_port            = yaml_get_int(config,    "ssh-port",    "SSH port for controlling the program (0 to disable)");
-	const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",    "network interface (IP address) to let the SSH port bind to");
-	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",    "directory where the SSH keys are stored");
+	const int ssh_port            = yaml_get_int(config,    "ssh-port",     "SSH port for controlling the program (0 to disable)");
+	const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",     "network interface (IP address) to let the SSH port bind to");
+	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",     "directory where the SSH keys are stored");
+
+	const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
 
 	signal(SIGINT, signal_handler);
 
@@ -670,7 +679,7 @@ int main(int argc, char *argv[])
 	auto proc             = exec_with_pipe(command, directory, width, height);
 	int  program_fd       = std::get<1>(proc);
 
-	std::thread read_program([&clients, &t, program_fd] { read_and_distribute_program(program_fd, &t, &clients); });
+	std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
 	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, &clients] {
 			if (telnet_port != 0)
