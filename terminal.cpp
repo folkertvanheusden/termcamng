@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "logging.h"
 #include "str.h"
 #include "terminal.h"
 #include "time.h"
@@ -222,7 +223,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 					// default font
 				}
 				else {
-					fprintf(stderr, "code %d for 'm' not supported\n", par_val);
+					dolog(ll_info, "code %d for 'm' not supported", par_val);
 				}
 			}
 		}
@@ -231,7 +232,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 		insert_character(par1 ? par1 : 1);
 	}
 	else {
-		fprintf(stderr, "Escape ^[[ %s %c not supported\n", parameters.c_str(), cmd);
+		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
 	}
 }
 

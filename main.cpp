@@ -22,6 +22,7 @@
 
 #include "error.h"
 #include "io.h"
+#include "logging.h"
 #include "picio.h"
 #include "proc.h"
 #include "str.h"
@@ -160,7 +161,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 
 		int r = ssh_bind_accept(sshbind, session);  // TODO unblock
 		if (r == SSH_ERROR) {
-			fprintf(stderr, "process_ssh: error accepting a connection: %s\n", ssh_get_error(sshbind));
+			dolog(ll_warning, "process_ssh: error accepting a connection: %s", ssh_get_error(sshbind));
 			ssh_disconnect(session);
 			ssh_free(session);
 			continue;
@@ -168,7 +169,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 
 		// authenticate
 		if (ssh_handle_key_exchange(session)) {
-			fprintf(stderr, "process_ssh: ssh_handle_key_exchange: %s\n", ssh_get_error(session));
+			dolog(ll_warning, "process_ssh: ssh_handle_key_exchange: %s", ssh_get_error(session));
 			ssh_disconnect(session);
 			ssh_free(session);
 			continue;
@@ -478,7 +479,7 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 
 			int rrc = read(program_fd, buffer, sizeof buffer);
 			if (rrc == -1 || rrc == 0) {
-				fprintf(stderr, "read_and_distribute_program: problem receiving from program%s\n", rrc ? strerror(errno) : "");
+				dolog(ll_warning, "read_and_distribute_program: problem receiving from program%s", rrc ? strerror(errno) : "");
 				break;
 			}
 
@@ -674,9 +675,19 @@ int main(int argc, char *argv[])
 
 	terminal t(&f, width, height, &stop);
 
-	std::string command   = yaml_get_string(config, "exec-command", "command to execute and render");
-	std::string directory = yaml_get_string(config, "directory",    "path to chdir for");
+	std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
+	std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
 
+	// configure logfile
+	YAML::Node cfg_log     = yaml_get_yaml_node(config, "logging",    "configuration of logging output");
+	std::string logfile    = yaml_get_string(cfg_log, "file",         "file to log to");
+
+	log_level_t ll_file    = str_to_ll(yaml_get_string(cfg_log, "loglevel-files",  "log-level for log-file"));
+	log_level_t ll_screen  = str_to_ll(yaml_get_string(cfg_log, "loglevel-screen", "log-level for screen output"));
+
+	setlog(logfile.c_str(), ll_file, ll_screen);
+
+	// main functionality
 	clients_t clients;
 
 	auto proc             = exec_with_pipe(command, directory, width, height);

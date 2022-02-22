@@ -21,3 +21,8 @@ ssh-keys: keys/
 
 exec-command: /usr/bin/irssi -c oftc
 directory: /tmp
+
+logging:
+  file: termcamng.log
+  loglevel-files: debug
+  loglevel-screen: debug

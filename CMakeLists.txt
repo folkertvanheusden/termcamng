@@ -16,6 +16,7 @@ add_executable(termcamng
 	error.cpp
 	font.cpp
 	io.cpp
+	logging.cpp
 	main.cpp
 	picio.cpp
 	proc.cpp
