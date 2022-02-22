@@ -51,12 +51,12 @@ void terminal::delete_line(const int y)
 
 	int n_characters_to_move = w * h - offset_from;
 
-	if (n_characters_to_move == 0) {
-		for(int cx = 0; cx<w; cx++)
-			screen[y * w + cx].c = ' ';
-	}
+	if (n_characters_to_move == 0)
+		erase_line(y);
 	else {
 		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
+
+		erase_line(h - 1);
 	}
 }
 
@@ -67,13 +67,10 @@ void terminal::insert_line(const int y)
 
 	int n_characters_to_move = w * h - offset_to;
 
-	if (n_characters_to_move == 0) {
-		for(int cx = 0; cx<w; cx++)
-			screen[y * w + cx].c = ' ';
-	}
-	else {
+	if (n_characters_to_move > 0)
 		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
-	}
+
+	erase_line(y);
 }
 
 void terminal::insert_character(const int n)
@@ -82,18 +79,24 @@ void terminal::insert_character(const int n)
 	int offset_from = y * w + x;
 	int offset_to   = y * w + x + 1;
 
-	for(int i=0; i<n; i++)
+	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
+
+		erase_cell(x, y);
+	}
 }
 
-void terminal::erase_character(const int n)
+void terminal::delete_character(const int n)
 {
 	int n_left      = w - x;
 	int offset_to   = y * w + x;
 	int offset_from = y * w + x + 1;
 
-	for(int i=0; i<n; i++)
+	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
+
+		erase_cell(w - 1, y);
+	}
 }
 
 void terminal::process_escape(const char cmd, const std::string & parameters)
@@ -211,14 +214,8 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			// use defaults
 		}
 
-		for(int cx=start_x; cx<end_x; cx++) {
-			int offset = y * w + cx;
-
-			screen[offset].c           = ' ';
-			screen[offset].fg_col_ansi = fg_col_ansi;
-			screen[offset].bg_col_ansi = bg_col_ansi;
-			screen[offset].attr        = attr;
-		}
+		for(int cx=start_x; cx<end_x; cx++)
+			erase_cell(cx, y);
 	}
 	else if (cmd == 'L') {
 		for(int i=0; i<(par1 ? par1 : 1); i++)
@@ -277,8 +274,8 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			screen[offset + i].attr        = attr;
 		}
 	}
-	else if (cmd == 'P') {  // erase character
-		erase_character(par1 ? par1 : 1);
+	else if (cmd == 'P') {  // delete character
+		delete_character(par1 ? par1 : 1);
 	}
 	else if (cmd == '@') {  // insert character
 		insert_character(par1 ? par1 : 1);
@@ -433,4 +430,20 @@ pos_t terminal::get_cell_at(const int cx, const int cy) const
 	int offset = cy * w + cx;
 
 	return screen[offset];
+}
+
+void terminal::erase_cell(const int cx, const int cy)
+{
+	const int offset = cy * w + cx;
+
+	screen[offset].c           = ' ';
+	screen[offset].fg_col_ansi = fg_col_ansi;
+	screen[offset].bg_col_ansi = bg_col_ansi;
+	screen[offset].attr        = attr;
+}
+
+void terminal::erase_line(const int cy)
+{
+	for(int cx=0; cx<w; cx++)
+		erase_cell(cx, cy);
 }

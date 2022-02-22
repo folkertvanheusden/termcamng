@@ -61,7 +61,10 @@ public:
 	void insert_line(const int y);
 
 	void insert_character(const int n);
-	void erase_character (const int n);
+	void delete_character(const int n);
+
+	void erase_cell(const int x, const int y);
+	void erase_line(const int cy);
 
 	void process_escape(const char cmd, const std::string & parameters);
 
