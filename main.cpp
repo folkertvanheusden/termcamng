@@ -487,8 +487,10 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 
 				std::string data(buffer, rrc);
 
-				if (local_output)
+				if (local_output) {
 					printf("%s", data.c_str());
+					fflush(stdout);
+				}
 
 				std::lock_guard(clients->lock);
 
@@ -666,6 +668,7 @@ int main(int argc, char *argv[])
 	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",     "directory where the SSH keys are stored");
 
 	const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
+	const bool do_fork            = yaml_get_bool(config,   "fork",         "fork into the background");
 
 	signal(SIGINT, signal_handler);
 
@@ -697,6 +700,11 @@ int main(int argc, char *argv[])
 			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(&t),
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 			MHD_OPTION_END);
+
+	if (do_fork) {
+		if (daemon(1, 1) == -1)
+			error_exit(true, "main: failed to fork into the background");
+	}
 
 	while(!stop)
 		sleep(1);
