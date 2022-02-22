@@ -50,6 +50,12 @@ files
 CP850.F16 comes from https://github.com/viler-int10h/vga-text-mode-fonts/releases/download/2020-11-25/VGAfonts-20-11-25-NO-previews.zip
 
 
+demo
+----
+
+http://vps001.vanheusden.com:8888/stream
+
+
 Written by Folkert van Heusden <mail@vanheusden.com>
 
 License: Apache License v2.0
