@@ -55,6 +55,11 @@ demo
 
 http://vps001.vanheusden.com:8888/stream
 
+Note: it works fine with the chrome browser on Linux. Current (Feb.
+2022) Firefox browsers sometimes show only a partial part of the
+screen. Also the Edge browser on windows and Safari on the iPhone
+show the stream correctly.
+
 
 Written by Folkert van Heusden <mail@vanheusden.com>
 
