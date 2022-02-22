@@ -15,6 +15,8 @@
 #include <libssh/server.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -89,6 +91,41 @@ std::string setup_telnet_session()
 	return out;
 }
 
+int function_conversation(int num_msg, const struct pam_message **msg, struct pam_response **resp, void *appdata_ptr)
+{
+	pam_response *reply = (pam_response *)appdata_ptr;
+
+	*resp = reply;
+
+	return PAM_SUCCESS;
+}
+
+std::pair<bool, std::string> authenticate_against_pam(const std::string & username, const std::string & password)
+{
+	struct pam_response *reply = (struct pam_response *)malloc(sizeof(struct pam_response));
+	reply->resp = strdup(password.c_str());
+	reply->resp_retcode = 0;
+
+	const struct pam_conv local_conversation { function_conversation, reply };
+
+	pam_handle_t *local_auth_handle = nullptr;
+	if (pam_start("common-auth", username.c_str(), &local_conversation, &local_auth_handle) != PAM_SUCCESS) {
+		free(reply);
+		return { false, "PAM error" };
+	}
+
+	int rc = pam_authenticate(local_auth_handle, PAM_SILENT);
+	pam_end(local_auth_handle, rc);
+
+	if (rc == PAM_AUTH_ERR)
+		return { false, "Authentication failed" };
+
+	if (rc != PAM_SUCCESS)
+		return { false, "PAM error" };
+
+	return { true, "Ok" };
+}
+
 typedef struct
 {
 	std::mutex               lock;
@@ -101,12 +138,14 @@ typedef struct
 	std::map<std::string, client_t *> clients;
 } clients_t;
 
-void process_ssh(terminal *const t, const std::string & ssh_keys, const int port, const int program_fd, clients_t *const clients)
+void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, clients_t *const clients)
 {
 	// setup ssh server
 	ssh_bind sshbind = ssh_bind_new();
 
 	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, myformat("%s/ssh_host_rsa_key", ssh_keys.c_str()).c_str());
+
+	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDADDR, bind_addr.c_str());
 
 	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
 
@@ -121,7 +160,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 
 		int r = ssh_bind_accept(sshbind, session);  // TODO unblock
 		if (r == SSH_ERROR) {
-			printf("error accepting a connection: %s\n", ssh_get_error(sshbind));
+			fprintf(stderr, "process_ssh: error accepting a connection: %s\n", ssh_get_error(sshbind));
 			ssh_disconnect(session);
 			ssh_free(session);
 			continue;
@@ -129,7 +168,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 
 		// authenticate
 		if (ssh_handle_key_exchange(session)) {
-			printf("ssh_handle_key_exchange: %s\n", ssh_get_error(session));
+			fprintf(stderr, "process_ssh: ssh_handle_key_exchange: %s\n", ssh_get_error(session));
 			ssh_disconnect(session);
 			ssh_free(session);
 			continue;
@@ -147,11 +186,10 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 
 			if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
 				const char *requested_user = ssh_message_auth_user(message);
-				printf("User \"%s\" requested SSH access\n", requested_user);
 
-				// TODO: check against PAM
-				if (strcmp(requested_user, "user") == 0 && strcmp(ssh_message_auth_password(message), "pass") == 0) {
-					printf("Access granted!\n");
+				auto auth_rc =  authenticate_against_pam(requested_user, ssh_message_auth_password(message));
+
+				if (auth_rc.first) {
 					auth_success = true;
 
 					username = requested_user;
@@ -161,8 +199,6 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 					ssh_message_free(message);
 					break;
 				}
-				
-				printf("Access denied\n");
 			}
 
 			ssh_message_reply_default(message);
@@ -173,11 +209,10 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 		if (!auth_success) {
 			ssh_disconnect(session);
 			ssh_free(session);
-			break;
+			continue;
 		}
 
 		// select a channel
-		printf("Wait for channel\n");
 		ssh_channel channel = nullptr;
 		while(!stop && channel == nullptr) {
 			ssh_message message = ssh_message_get(session);
@@ -188,34 +223,26 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 			}
 
 			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL_OPEN) {
-				printf("Received SSH_REQUEST_CHANNEL_OPEN\n");
-
-				if (ssh_message_subtype(message) == SSH_CHANNEL_SESSION) {
+				if (ssh_message_subtype(message) == SSH_CHANNEL_SESSION)
 					channel = ssh_message_channel_request_open_reply_accept(message);
-					if (channel)
-						printf("Channel requested (succes)\n");
-				}
 			}
 
 			ssh_message_free(message);
 		}
 
 		if (err) {
-			printf("err\n");
 			ssh_disconnect(session);
 			ssh_free(session);
 			continue;
 		}
 
 		// wait for shell request
-		printf("Wait for shell request\n");
 		while(!stop) {
 			ssh_message message = ssh_message_get(session);
 			if (!message)
 				break;
 
 			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL && ssh_message_subtype(message) == SSH_CHANNEL_REQUEST_SHELL) {
-				printf("User requested shell\n");
 				ssh_message_channel_request_reply_success(message);
 				ssh_message_free(message);
 				break;
@@ -225,9 +252,6 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const int port
 		}
 
 		std::thread client_thread([session, username, channel, clients, t, program_fd] {
-			printf("Starting \"shell\"\n");
-
-			// only 1 ssh user with a specific username concurrently currently
 			std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
 
 			std::unique_lock<std::mutex> lck(clients->lock);
@@ -622,16 +646,17 @@ int main(int argc, char *argv[])
 	std::string font_file = yaml_get_string(config, "font-file", "MS-DOS 8x16 console bitmap font-file");
 	font f(font_file);
 
-	const int width             = yaml_get_int(config,    "width",       "terminal console width (e.g. 80)");
-	const int height            = yaml_get_int(config,    "height",      "terminal console height (e.g. 25)");
+	const int width               = yaml_get_int(config,    "width",       "terminal console width (e.g. 80)");
+	const int height              = yaml_get_int(config,    "height",      "terminal console height (e.g. 25)");
 
-	const std::string bind_addr = yaml_get_string(config, "telnet-addr", "network interface (IP address) to let the telnet port bind to");
-	const int telnet_port       = yaml_get_int(config,    "telnet-port", "telnet port to listen on");
+	const std::string telnet_bind = yaml_get_string(config, "telnet-addr", "network interface (IP address) to let the telnet port bind to");
+	const int telnet_port         = yaml_get_int(config,    "telnet-port", "telnet port to listen on (0 to disable)");
 
-	const int http_port         = yaml_get_int(config,    "http-port",   "HTTP port to serve PNG rendering of terminal");
+	const int http_port           = yaml_get_int(config,    "http-port",   "HTTP port to serve PNG rendering of terminal");
 
-	const int ssh_port          = yaml_get_int(config,    "ssh-port",    "SSH port for controlling the program");
-	const std::string ssh_keys  = yaml_get_string(config, "ssh-keys",    "directory where the SSH keys are stored");
+	const int ssh_port            = yaml_get_int(config,    "ssh-port",    "SSH port for controlling the program (0 to disable)");
+	const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",    "network interface (IP address) to let the SSH port bind to");
+	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",    "directory where the SSH keys are stored");
 
 	signal(SIGINT, signal_handler);
 
@@ -647,9 +672,15 @@ int main(int argc, char *argv[])
 
 	std::thread read_program([&clients, &t, program_fd] { read_and_distribute_program(program_fd, &t, &clients); });
 
-	std::thread telnet_thread_handle([&t, program_fd, width, height, bind_addr, telnet_port, &clients] { process_telnet(&t, program_fd, width, height, bind_addr, telnet_port, &clients); });
+	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, &clients] {
+			if (telnet_port != 0)
+				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, &clients);
+				});
 
-	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_port, &clients] { process_ssh(&t, ssh_keys, ssh_port, program_fd, &clients); });
+	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, &clients] {
+			if (ssh_port != 0)
+				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, &clients);
+				});
 
 	struct MHD_Daemon *d = MHD_start_daemon(
 			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
