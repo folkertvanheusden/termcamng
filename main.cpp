@@ -686,6 +686,11 @@ int main(int argc, char *argv[])
 
 	setlog(logfile.c_str(), ll_file, ll_screen);
 
+	if (do_fork) {
+		if (daemon(1, 1) == -1)
+			error_exit(true, "main: failed to fork into the background");
+	}
+
 	// main functionality
 	clients_t clients;
 
@@ -710,11 +715,6 @@ int main(int argc, char *argv[])
 			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(&t),
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 			MHD_OPTION_END);
-
-	if (do_fork) {
-		if (daemon(1, 1) == -1)
-			error_exit(true, "main: failed to fork into the background");
-	}
 
 	while(!stop)
 		sleep(1);
