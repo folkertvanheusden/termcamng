@@ -408,3 +408,10 @@ char terminal::get_char_at(const int cx, const int cy) const
 
 	return screen[offset].c;
 }
+
+pos_t terminal::get_cell_at(const int cx, const int cy) const
+{
+	int offset = cy * w + cx;
+
+	return screen[offset];
+}

@@ -55,6 +55,7 @@ public:
 	std::pair<int, int> get_current_xy();
 
 	char get_char_at(const int x, const int y) const;
+	pos_t get_cell_at(const int x, const int y) const;
 
 	void delete_line(const int y);
 	void insert_line(const int y);

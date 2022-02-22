@@ -42,7 +42,7 @@ std::string generate_initial_screen(terminal *const t)
 	std::string out;
 
 	// clear_screen, go_to 1,1
-	out += "\033[2J\033[H";
+	out += "\033[2J";
 
 	int w = t->get_width();
 	int h = t->get_height();
@@ -52,14 +52,13 @@ std::string generate_initial_screen(terminal *const t)
 
 		int  cur_w     = last_line ? w - 1 : w;
 
+		out += myformat("\033[%dH", y + 1);
+
 		for(int x=0; x<cur_w; x++) {
-			uint8_t c = t->get_char_at(x, y);
+			pos_t c = t->get_cell_at(x, y);
 
-			out += c;
+			out += myformat("\033[%d;%dm%c", c.fg_col_ansi, c.bg_col_ansi, c.c);
 		}
-
-		if (!last_line)
-			out += "\r\n";
 	}
 
 	auto cursor_location = t->get_current_xy();
