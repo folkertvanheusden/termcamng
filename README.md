@@ -40,8 +40,8 @@ to work (see "ssh-keygen -A").
 http
 ----
 
-http://ip-adres/        <-- 1 PNG frame
-http://ip-adres/stream  <-- stream of PNG images
+ * http://ip-adres/        <-- 1 PNG frame
+ * http://ip-adres/stream  <-- stream of PNG images
 
 
 files
