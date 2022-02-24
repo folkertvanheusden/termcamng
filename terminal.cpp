@@ -383,13 +383,13 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 			int color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
 
 			int fg_color     = screen[offset].fg_col_ansi;
-			int bg_color     = screen[offset].bg_col_ansi;
+			int bg_color     = screen[0].bg_col_ansi;
 
 			if (fg_color == bg_color)
 				fg_color = 7, bg_color = 0;
 
 			rgb_t fg         = color_map[color_offset][fg_color];
-			rgb_t bg         = color_map[color_offset][bg_color];
+			rgb_t bg         = color_map[0][bg_color];
 
 			if (screen[offset].attr & A_INVERSE)
 				std::swap(fg, bg);
