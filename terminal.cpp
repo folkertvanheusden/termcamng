@@ -380,18 +380,17 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 			int  offset      = cy * w + cx;
 			char c           = screen[offset].c;
 
-			int color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
+			int  bold        = screen[offset].attr & A_BOLD ? 1 : 0;
 
-			int fg_color     = screen[offset].fg_col_ansi;
-			int bg_color     = screen[0].bg_col_ansi;
+			bool inverse     = screen[offset].attr & A_INVERSE;
 
-			if (screen[offset].attr & A_INVERSE)
-				std::swap(fg_color, bg_color);
+			int  fg_color    = inverse ? screen[offset].bg_col_ansi : screen[offset].fg_col_ansi;
+			int  bg_color    = inverse ? screen[offset].fg_col_ansi : screen[offset].bg_col_ansi;
 
 			if (fg_color == bg_color)
 				fg_color = 7, bg_color = 0;
 
-			rgb_t fg         = color_map[color_offset][fg_color];
+			rgb_t fg         = color_map[bold][fg_color];
 			rgb_t bg         = color_map[0][bg_color];
 
 			if (c != 0) {
