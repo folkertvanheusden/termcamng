@@ -25,14 +25,14 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 		if (rc)
 			error_exit(false, "cannot open font file %s: %x", font_file.c_str(), rc);
 
+		FT_Select_Charmap(face, ft_encoding_unicode);
+
+		FT_Set_Char_Size(face, font_height * 64, font_height * 64, 72, 72);
+
 		faces.push_back(face);
 	}
 
 	// font '0' (first font) must contain all basic characters
-	FT_Select_Charmap(faces.at(0), ft_encoding_unicode);
-
-	FT_Set_Char_Size(faces.at(0), font_height * 64, font_height * 64, 72, 72);
-
 	// determine dimensions of character set
 	for(UChar32 c = 32; c < 127; c++) {
 		int glyph_index   = FT_Get_Char_Index(faces.at(0), c);
