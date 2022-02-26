@@ -160,9 +160,11 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 
 	FT_GlyphSlot slot = face->glyph;
 
+	int draw_x = x + font_width / 2 - slot->metrics.width / 128;
+
 	int draw_y = y + max_ascender / 64 - slot->bitmap_top;
 
-	draw_glyph_bitmap(&slot->bitmap, output_height, x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
+	draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
 
 	return true;
 }
