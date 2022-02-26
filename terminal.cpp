@@ -367,7 +367,7 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 
 	*ts_after = latest_update;
 
-	const int char_w = 8;  // TODO
+	const int char_w = f->get_width();
 	const int char_h = f->get_height();
 
 	int pixels_per_row = w * char_w;

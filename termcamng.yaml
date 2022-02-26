@@ -1,7 +1,7 @@
 font-height: 16
 font-file: /usr/share/fonts/truetype/unifont/unifont.ttf
 
-local-output: true
+local-output: false
 
 fork: false
 

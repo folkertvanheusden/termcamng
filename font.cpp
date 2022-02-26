@@ -24,8 +24,18 @@ font::font(const std::string & font_file, const int font_height) : font_height(f
 
 	FT_Select_Charmap(face, ft_encoding_unicode);
 
-	/* set character size */
 	FT_Set_Char_Size(face, font_height * 64, font_height * 64, 72, 72);
+
+	// determine dimensions of character set
+	for(UChar32 c = 32; c < 127; c++) {
+		int glyph_index   = FT_Get_Char_Index(face, c);
+
+		if (FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER) == 0) {
+			font_width   = std::max(font_width  , int(face->glyph->metrics.horiAdvance) / 64);
+
+			max_ascender = std::max(max_ascender, int(face->glyph->metrics.horiBearingY));
+		}
+	}
 }
 
 font::~font()
@@ -120,6 +130,11 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 	}
 }
 
+int font::get_width() const
+{
+	return font_width;
+}
+
 int font::get_height() const
 {
 	return font_height;
@@ -127,16 +142,14 @@ int font::get_height() const
 
 bool font::draw_glyph(const UChar32 utf_character, const int output_height, const bool invert, const bool underline, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
-	FT_GlyphSlot slot = face->glyph;
-
-	int glyph_index = FT_Get_Char_Index(face, utf_character);
+	int glyph_index   = FT_Get_Char_Index(face, utf_character);
 
 	if (FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER))
 		return false;
 
 	// draw background
 	for(int cy=0; cy<output_height; cy++) {
-		for(int cx=0; cx<8; cx++) {  // TODO
+		for(int cx=0; cx<font_width; cx++) {
 			int offset = (y + cy) * dest_width * 3 + (x + cx) * 3;
 
 			dest[offset + 0] = bg.r;
@@ -145,7 +158,11 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 		}
 	}
 
-	draw_glyph_bitmap(&slot->bitmap, output_height, x, y, fg, bg, invert, underline, dest, dest_width, dest_height);
+	FT_GlyphSlot slot = face->glyph;
+
+	int draw_y = y + max_ascender / 64 - slot->bitmap_top;
+
+	draw_glyph_bitmap(&slot->bitmap, output_height, x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
 
 	return true;
 }
