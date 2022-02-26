@@ -86,14 +86,14 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 			int pixel_v = bitmap->buffer[yo * bitmap->width + xo];
 
-			if (!invert)
+			if (invert)
 				pixel_v = 255 - pixel_v;
 
 			int sub = 255 - pixel_v;
 
-			dest[o + 0] = (sub * fg.r + pixel_v * dest[o + 0]) >> 8;
-			dest[o + 1] = (sub * fg.g + pixel_v * dest[o + 1]) >> 8;
-			dest[o + 2] = (sub * fg.b + pixel_v * dest[o + 2]) >> 8;
+			dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+			dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+			dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
 		}
 	}
 
@@ -133,6 +133,17 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 
 	if (FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER))
 		return false;
+
+	// draw background
+	for(int cy=0; cy<output_height; cy++) {
+		for(int cx=0; cx<8; cx++) {  // TODO
+			int offset = (y + cy) * dest_width * 3 + (x + cx) * 3;
+
+			dest[offset + 0] = bg.r;
+			dest[offset + 1] = bg.g;
+			dest[offset + 2] = bg.b;
+		}
+	}
 
 	draw_glyph_bitmap(&slot->bitmap, output_height, x, y, fg, bg, invert, underline, dest, dest_width, dest_height);
 
