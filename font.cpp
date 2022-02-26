@@ -125,36 +125,42 @@ int font::get_height() const
 
 bool font::draw_glyph(const UChar32 utf_character, const int output_height, const bool invert, const bool underline, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
-	for(size_t face = 0; face<faces.size(); face++) {
-		int glyph_index = FT_Get_Char_Index(faces.at(face), utf_character);
+	std::vector<FT_Encoding> encodings { ft_encoding_unicode, ft_encoding_symbol };
 
-		if (glyph_index == 0 && face < faces.size() - 1)
-			continue;
+	for(auto & encoding : encodings) {
+		for(size_t face = 0; face<faces.size(); face++) {
+			FT_Select_Charmap(faces.at(face), encoding);
 
-		if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_RENDER))
-			continue;
+			int glyph_index = FT_Get_Char_Index(faces.at(face), utf_character);
 
-		// draw background
-		for(int cy=0; cy<output_height; cy++) {
-			for(int cx=0; cx<font_width; cx++) {
-				int offset = (y + cy) * dest_width * 3 + (x + cx) * 3;
+			if (glyph_index == 0 && face < faces.size() - 1)
+				continue;
 
-				dest[offset + 0] = bg.r;
-				dest[offset + 1] = bg.g;
-				dest[offset + 2] = bg.b;
+			if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_RENDER))
+				continue;
+
+			// draw background
+			for(int cy=0; cy<output_height; cy++) {
+				for(int cx=0; cx<font_width; cx++) {
+					int offset = (y + cy) * dest_width * 3 + (x + cx) * 3;
+
+					dest[offset + 0] = bg.r;
+					dest[offset + 1] = bg.g;
+					dest[offset + 2] = bg.b;
+				}
 			}
+
+			FT_GlyphSlot slot   = faces.at(face)->glyph;
+
+			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
+
+			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
+
+			draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
+
+			return true;
 		}
-
-		FT_GlyphSlot slot   = faces.at(face)->glyph;
-
-		int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
-
-		int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
-
-		draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
-
-		break;
 	}
 
-	return true;
+	return false;
 }
