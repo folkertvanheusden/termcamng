@@ -391,7 +391,7 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 				fg_color = 7, bg_color = 0;
 
 			rgb_t   fg           = color_map[color_offset][fg_color];
-			rgb_t   bg           = color_map[color_offset][bg_color];
+			rgb_t   bg           = color_map[0][bg_color];
 
 			bool    inverse      = !!(screen[offset].attr & A_INVERSE);
 			bool    underline    = false;
