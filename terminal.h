@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "common.h"
 #include "font.h"
 
 
@@ -18,12 +19,6 @@ typedef struct {
 	int fg_col_ansi, bg_col_ansi;
 	int attr;
 } pos_t;
-
-typedef struct {
-	int r;
-	int g;
-	int b;
-} rgb_t;
 
 class terminal {
 private:

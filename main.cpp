@@ -657,8 +657,9 @@ int main(int argc, char *argv[])
 
 	YAML::Node config = YAML::LoadFile(cfg_file);
 
-	std::string font_file = yaml_get_string(config, "font-file", "MS-DOS 8x16 console bitmap font-file");
-	font f(font_file);
+	const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
+	std::string font_file         = yaml_get_string(config, "font-file",    "TTF font file");
+	font f(font_file, font_height);
 
 	const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
 	const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");

@@ -367,55 +367,43 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 
 	*ts_after = latest_update;
 
-	constexpr const int char_w = 8;
-	constexpr const int char_h = 16;
+	const int char_w = 8;  // TODO
+	const int char_h = f->get_height();
+
+	int pixels_per_row = w * char_w;
 
 	*out = reinterpret_cast<uint8_t *>(calloc(1, w * char_w * h * char_h * 3));
 
-	int pixels_per_row = w * char_w;
-	int bytes_per_row  = pixels_per_row * 3;
+	*out_w = pixels_per_row;
+	*out_h = h * char_h;
 
 	for(int cy=0; cy<h; cy++) {
 		for(int cx=0; cx<w; cx++) {
-			int  offset      = cy * w + cx;
-			char c           = screen[offset].c;
+			int     offset       = cy * w + cx;
+			uint8_t c            = screen[offset].c;
 
-			int color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
+			int     color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
 
-			int fg_color     = screen[offset].fg_col_ansi;
-			int bg_color     = screen[offset].bg_col_ansi;
+			int     fg_color     = screen[offset].fg_col_ansi;
+			int     bg_color     = screen[offset].bg_col_ansi;
 
 			if (fg_color == bg_color)
 				fg_color = 7, bg_color = 0;
 
-			rgb_t fg         = color_map[color_offset][fg_color];
-			rgb_t bg         = color_map[color_offset][bg_color];
+			rgb_t   fg           = color_map[color_offset][fg_color];
+			rgb_t   bg           = color_map[color_offset][bg_color];
 
-			if (screen[offset].attr & A_INVERSE)
-				std::swap(fg, bg);
+			bool    inverse      = !!(screen[offset].attr & A_INVERSE);
+			bool    underline    = false;
 
-			if (c != 0) {
-				const uint8_t *const char_bitmap = f->get_char_pointer(c);
+			int     x            = cx * char_w;
+			int     y            = cy * char_h;
 
-				for(int py=0; py<16; py++) {
-					uint8_t scanline = char_bitmap[py];
-
-					for(int px=0; px<8; px++) {
-						int  offset = cy * bytes_per_row * char_h + py * bytes_per_row + cx * char_w * 3 + px * 3;
-
-						bool bit    = !!(scanline & (1 << (7 - px)));
-
-						(*out)[offset + 0] = bit ? fg.r : bg.r;
-						(*out)[offset + 1] = bit ? fg.g : bg.g;
-						(*out)[offset + 2] = bit ? fg.b : bg.b;
-					}
-				}
+			if (!f->draw_glyph(c, char_h, inverse, underline, fg, bg, x, y, *out, *out_w, *out_h)) {
+				// TODO
 			}
 		}
 	}
-
-	*out_w = pixels_per_row;
-	*out_h = h * char_h;
 }
 
 char terminal::get_char_at(const int cx, const int cy) const

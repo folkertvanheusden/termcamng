@@ -1,4 +1,5 @@
-font-file: CP850.F16
+font-height: 16
+font-file: /usr/share/fonts/truetype/unifont/unifont.ttf
 
 local-output: true
 
@@ -19,7 +20,7 @@ ssh-port: 2200
 #ssh-keys: /etc/ssh
 ssh-keys: keys/
 
-exec-command: /usr/bin/irssi -c oftc
+exec-command: /usr/bin/htop
 directory: /tmp
 
 logging:
