@@ -128,6 +128,9 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 	for(size_t face = 0; face<faces.size(); face++) {
 		int glyph_index = FT_Get_Char_Index(faces.at(face), utf_character);
 
+		if (glyph_index == 0 && face < faces.size() - 1)
+			continue;
+
 		if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_RENDER))
 			continue;
 
