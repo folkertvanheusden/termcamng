@@ -416,22 +416,22 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 
 	for(int cy=0; cy<h; cy++) {
 		for(int cx=0; cx<w; cx++) {
-			int     offset       = cy * w + cx;
-			uint8_t c            = screen[offset].c;
+			int      offset       = cy * w + cx;
+			uint32_t c            = screen[offset].c;
 
-			int     color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
+			int      color_offset = screen[offset].attr & A_BOLD ? 1 : 0;
 
-			int     fg_color     = screen[offset].fg_col_ansi;
-			int     bg_color     = screen[offset].bg_col_ansi;
+			int      fg_color     = screen[offset].fg_col_ansi;
+			int      bg_color     = screen[offset].bg_col_ansi;
 
 			if (fg_color == bg_color)
 				fg_color = 7, bg_color = 0;
 
-			rgb_t   fg           = color_map[color_offset][fg_color];
-			rgb_t   bg           = color_map[0][bg_color];
+			rgb_t    fg           = color_map[color_offset][fg_color];
+			rgb_t    bg           = color_map[0][bg_color];
 
-			bool    inverse      = !!(screen[offset].attr & A_INVERSE);
-			bool    underline    = false;
+			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
+			bool     underline    = false;
 
 			int     x            = cx * char_w;
 			int     y            = cy * char_h;

@@ -125,7 +125,7 @@ int font::get_height() const
 
 bool font::draw_glyph(const UChar32 utf_character, const int output_height, const bool invert, const bool underline, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
-	std::vector<FT_Encoding> encodings { ft_encoding_unicode, ft_encoding_symbol };
+	std::vector<FT_Encoding> encodings { ft_encoding_symbol, ft_encoding_unicode };
 
 	for(auto & encoding : encodings) {
 		for(size_t face = 0; face<faces.size(); face++) {

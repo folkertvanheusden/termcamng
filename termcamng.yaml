@@ -1,8 +1,8 @@
 font-height: 16
 
 font-files:
- - clacon2.ttf
  - /usr/share/fonts/truetype/unifont/unifont.ttf
+ - /usr/share/wine/fonts/wingding.ttf
 
 local-output: false
 
@@ -23,7 +23,7 @@ ssh-port: 2200
 #ssh-keys: /etc/ssh
 ssh-keys: keys/
 
-exec-command: /usr/bin/htop
+exec-command: /usr/bin/irssi -c oftc
 directory: /tmp
 
 logging:
