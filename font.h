@@ -46,5 +46,3 @@ public:
 
 	bool draw_glyph(const UChar32 utf_character, const int height, const bool invert, const bool underline, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height);
 };
-
-std::string find_font_by_name(const std::string & font_name, const std::string & default_font_file);
