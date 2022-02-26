@@ -650,7 +650,7 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 int main(int argc, char *argv[])
 {
-	std::string cfg_file = "termcamng.yaml";
+	std::string cfg_file = argc == 2 ? argv[1] : "termcamng.yaml";
 
 	if (argc == 2)
 		cfg_file = argv[1];
@@ -658,8 +658,18 @@ int main(int argc, char *argv[])
 	YAML::Node config = YAML::LoadFile(cfg_file);
 
 	const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
-	std::string font_file         = yaml_get_string(config, "font-file",    "TTF font file");
-	font f(font_file, font_height);
+
+	YAML::Node font_map           = yaml_get_yaml_node(config, "font-files", "TTF font file");
+
+	std::vector<std::string> font_files;
+
+	for(YAML::const_iterator it = font_map.begin(); it != font_map.end(); it++) {
+		const std::string file = it->as<std::string>();
+
+		font_files.push_back(file);
+	}
+
+	font f(font_files, font_height);
 
 	const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
 	const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");

@@ -340,10 +340,8 @@ void terminal::process_input(const char *const in, const size_t len)
 
 				utf8_len--;
 
-				if (utf8_len == 0) {
+				if (utf8_len == 0)
 					c = utf8_code;
-					printf("%u\n", c);
-				}
 			}
 			else if ((in[i] & 0xe0) == 0xc0) {
 				utf8_code = in[i] & 31;

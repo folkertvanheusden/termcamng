@@ -1,5 +1,8 @@
 font-height: 16
-font-file: /usr/share/fonts/truetype/unifont/unifont.ttf
+
+font-files:
+ - clacon2.ttf
+ - /usr/share/fonts/truetype/unifont/unifont.ttf
 
 local-output: false
 
