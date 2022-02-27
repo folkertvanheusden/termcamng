@@ -120,9 +120,6 @@ MHD_Result get_terminal_png_frame(void *cls,
 		const char *version,
 		const char *upload_data, size_t *upload_data_size, void **ptr)
 {
-	if (strcmp(method, "GET") != 0)
-		return MHD_NO;
-
 	http_server_parameters_t *const hsp = reinterpret_cast<http_server_parameters_t *>(cls);
 
 	if (strcmp(url, "/") == 0) {
