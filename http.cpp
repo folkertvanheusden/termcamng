@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "http.h"
 #include "picio.h"
 #include "terminal.h"
 
@@ -10,6 +11,8 @@
 typedef struct
 {
 	terminal *t;
+
+	int       compression_level;
 
 	uint64_t  buffer_ts;
 
@@ -27,7 +30,7 @@ void *free_parameters(void *cls)
 	return nullptr;
 }
 
-std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts_after)
+std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts_after, const int compression_level)
 {
 	uint8_t *out   = nullptr;
 	int      out_w = 0;
@@ -39,7 +42,7 @@ std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts
 
 	FILE *fh = open_memstream(&data_out, &data_out_len);
 
-	write_PNG_file(fh, out_w, out_h, out);
+	write_PNG_file(fh, out_w, out_h, compression_level, out);
 
 	fclose(fh);
 
@@ -53,7 +56,7 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
 
 	if (p->buffer == nullptr) {
-		auto png = get_png_frame(p->t, &p->buffer_ts);
+		auto png = get_png_frame(p->t, &p->buffer_ts, p->compression_level);
 
 		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n\r\n", png.second);
 
@@ -100,11 +103,11 @@ MHD_Result get_terminal_png_frame(void *cls,
 	if (strcmp(method, "GET") != 0)
 		return MHD_NO;
 
-	terminal *t = reinterpret_cast<terminal *>(cls);
+	http_server_parameters_t *const hsp = reinterpret_cast<http_server_parameters_t *>(cls);
 
 	if (strcmp(url, "/") == 0) {
 		uint64_t after_ts = 0;
-		auto     png      = get_png_frame(t, &after_ts);
+		auto     png      = get_png_frame(hsp->t, &after_ts, hsp->compression_level);
 
 		struct MHD_Response *response = MHD_create_response_from_buffer(png.second, png.first, MHD_RESPMEM_MUST_COPY);
 
@@ -127,9 +130,11 @@ MHD_Result get_terminal_png_frame(void *cls,
 		if (!parameters)
 			return MHD_NO;
 
-		parameters->t = t;
+		parameters->t                 = hsp->t;
 
-		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, t->get_width() * t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
+		parameters->compression_level = hsp->compression_level;
+
+		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, hsp->t->get_width() * hsp->t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
 
 		MHD_Result ret = MHD_YES;
 
@@ -146,12 +151,12 @@ MHD_Result get_terminal_png_frame(void *cls,
 	return MHD_NO;
 }
 
-struct MHD_Daemon * start_http_server(const int http_port, terminal *const t)
+struct MHD_Daemon * start_http_server(const int http_port, http_server_parameters_t *const hsp)
 {
 	return MHD_start_daemon(
 			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
 			http_port,
-			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(t),
+			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(hsp),
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 			MHD_OPTION_END);
 }

@@ -11,6 +11,8 @@ fork: false
 width: 80
 height: 25
 
+compression-level: 34
+
 telnet-addr: 127.0.0.1
 # set to 0 to disable
 telnet-port: 2300

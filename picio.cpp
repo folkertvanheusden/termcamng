@@ -15,7 +15,7 @@ static void libpng_warning_handler(png_structp png, png_const_charp msg)
 	printf("libpng warning: %s\n", msg);
 }
 
-void write_PNG_file(FILE *const fh, const int ncols, const int nrows, uint8_t *pixels)
+void write_PNG_file(FILE *const fh, const int ncols, const int nrows, const int compression_level, uint8_t *pixels)
 {
 	png_bytep *row_pointers = (png_bytep *)malloc(sizeof(png_bytep) * nrows);
 	if (!row_pointers)
@@ -34,7 +34,7 @@ void write_PNG_file(FILE *const fh, const int ncols, const int nrows, uint8_t *p
 
 	png_init_io(png, fh);
 
-	png_set_compression_level(png, 3);
+	png_set_compression_level(png, compression_level * 9 / 100);
 
 	png_set_IHDR(png, info, ncols, nrows, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
@@ -43,7 +43,7 @@ void write_PNG_file(FILE *const fh, const int ncols, const int nrows, uint8_t *p
 	text_ptr[0].text = (png_charp)"termcamng";
 	text_ptr[0].compression = PNG_TEXT_COMPRESSION_NONE;
 	text_ptr[1].key = (png_charp)"URL";
-	text_ptr[1].text = (png_charp)"http://www.vanheusden.com/termcamng/";
+	text_ptr[1].text = (png_charp)"https://github.com/folkertvanheusden/termcamng";
 	text_ptr[1].compression = PNG_TEXT_COMPRESSION_NONE;
 	png_set_text(png, info, text_ptr, 2);
 

@@ -556,6 +556,7 @@ int main(int argc, char *argv[])
 
 	const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
 	const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");
+	const int compression_level   = yaml_get_int(config,    "compression-level", "value between 0 (no compression) and 100 (max.)");
 
 	const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
 	const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
@@ -612,7 +613,11 @@ int main(int argc, char *argv[])
 				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, &clients);
 				});
 
-	MHD_Daemon *d = start_http_server(http_port, &t);
+	http_server_parameters_t server_parameters { 0 };
+	server_parameters.t                 = &t;
+	server_parameters.compression_level = compression_level;
+
+	MHD_Daemon *d = start_http_server(http_port, &server_parameters);
 
 	while(!stop)
 		sleep(1);
