@@ -488,7 +488,8 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 {
 	set_thread_name("program-i/o");
 
-	printf("\033[8;%d;%dt\033[2J", t->get_height(), t->get_width());
+	if (local_output)
+		printf("\033[8;%d;%dt\033[2J", t->get_height(), t->get_width());
 
 	struct pollfd fds[] = { { program_fd, POLLIN, 0 } };
 
