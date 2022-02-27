@@ -564,6 +564,8 @@ int main(int argc, char *argv[])
 
 	const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
 
+	const int minimum_fps         = yaml_get_int(config,    "minimum-fps",  "minimum number of frame per second; set to 0 to not control this");
+
 	const int ssh_port            = yaml_get_int(config,    "ssh-port",     "SSH port for controlling the program (0 to disable)");
 	const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",     "network interface (IP address) to let the SSH port bind to");
 	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",     "directory where the SSH keys are stored");
@@ -617,6 +619,7 @@ int main(int argc, char *argv[])
 	http_server_parameters_t server_parameters { 0 };
 	server_parameters.t                 = &t;
 	server_parameters.compression_level = compression_level;
+	server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
 	MHD_Daemon *d = start_http_server(http_port, &server_parameters);
 

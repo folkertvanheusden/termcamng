@@ -395,19 +395,31 @@ void terminal::process_input(const std::string & in)
 	process_input(in.c_str(), in.size());
 }
 
-void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const out_w, int *const out_h)
+void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h)
 {
+	uint64_t start_wait = get_ms();
+
 	std::unique_lock<std::mutex> lck(lock);
 
-	while(latest_update <= *ts_after && !*stop_flag)
-		cond.wait_for(lck, std::chrono::milliseconds(500));
+	while(latest_update <= *ts_after && !*stop_flag && (get_ms() - start_wait < max_wait || max_wait <= 0)) {
+		int wait_for_delay = 500;
+
+		if (max_wait > 0) {
+			int interval_time_left = std::max(0, max_wait - int(get_ms() - start_wait));
+
+			wait_for_delay = std::min(interval_time_left, std::min(max_wait, 500));
+		}
+
+		if (wait_for_delay > 0)
+			cond.wait_for(lck, std::chrono::milliseconds(wait_for_delay));
+	}
 
 	*ts_after = latest_update;
 
-	const int char_w = f->get_width();
-	const int char_h = f->get_height();
+	const int char_w    = f->get_width();
+	const int char_h    = f->get_height();
 
-	int pixels_per_row = w * char_w;
+	int pixels_per_row  = w * char_w;
 
 	*out = reinterpret_cast<uint8_t *>(calloc(1, w * char_w * h * char_h * 3));
 
