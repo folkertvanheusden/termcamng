@@ -78,7 +78,7 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 	if (p->buffer == nullptr) {
 		auto image = p->png ? get_png_frame(p->t, &p->buffer_ts, p->max_wait, p->compression_level) : get_jpeg_frame(p->t, &p->buffer_ts, p->max_wait, p->compression_level);
 
-		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", p->png ? "png" : "jpeg", image.second);
+		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "\r\n--12345\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", p->png ? "png" : "jpeg", image.second);
 
 		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + image.second));
 		if (!temp)
@@ -123,6 +123,29 @@ MHD_Result get_terminal_png_frame(void *cls,
 	http_server_parameters_t *const hsp = reinterpret_cast<http_server_parameters_t *>(cls);
 
 	if (strcmp(url, "/") == 0) {
+		std::string page = 
+			"<!DOCTYPE html>"
+			"<html lang=\"en\">"
+			"<body>"
+			"<img src=\"/stream.mjpeg\">"
+			"</body>"
+			"</html>";
+
+		struct MHD_Response *response = MHD_create_response_from_buffer(page.size(), const_cast<char *>(page.c_str()), MHD_RESPMEM_MUST_COPY);
+
+		MHD_Result ret = MHD_NO;
+
+		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "text/html") == MHD_NO)
+			ret = MHD_NO;
+		else
+			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+
+		MHD_destroy_response(response);
+
+		return ret;
+	}
+
+	if (strcmp(url, "/frame.png") == 0) {
 		uint64_t after_ts = 0;
 		auto     png      = get_png_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
 
@@ -142,24 +165,17 @@ MHD_Result get_terminal_png_frame(void *cls,
 		return ret;
 	}
 
-	if (strcmp(url, "/stream") == 0  || strcmp(url, "/stream.mjpeg") == 0) {
-		http_parameters_t *parameters = reinterpret_cast<http_parameters_t *>(calloc(1, sizeof(http_parameters_t)));
-		if (!parameters)
-			return MHD_NO;
+	if (strcmp(url, "/frame.jpeg") == 0) {
+		uint64_t after_ts = 0;
+		auto     jpeg     = get_jpeg_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
 
-		parameters->t                 = hsp->t;
+		struct MHD_Response *response = MHD_create_response_from_buffer(jpeg.second, jpeg.first, MHD_RESPMEM_MUST_COPY);
 
-		parameters->png               = strcmp(url, "/stream") == 0;
+		free(jpeg.first);
 
-		parameters->compression_level = hsp->compression_level;
+		MHD_Result ret = MHD_NO;
 
-		parameters->max_wait          = hsp->max_wait;
-
-		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, hsp->t->get_width() * hsp->t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
-
-		MHD_Result ret = MHD_YES;
-
-		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "multipart/x-mixed-replace; boundary=--12345") == MHD_NO)
+		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/jpeg") == MHD_NO)
 			ret = MHD_NO;
 		else
 			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
@@ -169,7 +185,43 @@ MHD_Result get_terminal_png_frame(void *cls,
 		return ret;
 	}
 
-	return MHD_NO;
+	if (strcmp(url, "/stream.mpng") == 0  || strcmp(url, "/stream.mjpeg") == 0) {
+		http_parameters_t *parameters = reinterpret_cast<http_parameters_t *>(calloc(1, sizeof(http_parameters_t)));
+		if (!parameters)
+			return MHD_NO;
+
+		parameters->t                 = hsp->t;
+
+		parameters->png               = strcmp(url, "/stream.mpng") == 0;
+
+		parameters->compression_level = hsp->compression_level;
+
+		parameters->max_wait          = hsp->max_wait;
+
+		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, hsp->t->get_width() * hsp->t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
+
+		MHD_Result ret = MHD_YES;
+
+		if (ret == MHD_YES)
+			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "multipart/x-mixed-replace;boundary=\"--12345\"");
+
+		if (ret == MHD_YES)
+			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_PRAGMA, "no-cache");
+
+		if (ret == MHD_YES)
+			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_CACHE_CONTROL, "no-store");
+
+		if (ret == MHD_YES)
+			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+
+		MHD_destroy_response(response);
+
+		return ret;
+	}
+
+	struct MHD_Response *response = MHD_create_response_from_buffer(0, nullptr, MHD_RESPMEM_MUST_COPY);
+
+	return MHD_queue_response(connection, 404, response);
 }
 
 struct MHD_Daemon * start_http_server(const int http_port, http_server_parameters_t *const hsp)
