@@ -121,7 +121,7 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 	else if (cmd == 'b') { // repeat
 		int n = par1 ? par1 : 1;
 
-		char data[] = { last_character };
+		char data[] = { last_character };  // TODO
 
 		for(int i=0; i<n; i++)
 			process_input(data, sizeof data);
@@ -289,14 +289,16 @@ void terminal::process_input(const char *const in, const size_t len)
 {
 	for(size_t i=0; i<len; i++) {
 		if (in[i] == 13)  // carriage return
-			x = 0;
+			x = 0, utf8_len = 0;
 		else if (in[i] == 10)  // new line
-			y++;
+			y++, utf8_len = 0;
 		else if (in[i] == 8) {  // backspace
 			if (x)
 				x--;
 			else if (y)
 				x = 0, y--;
+
+			utf8_len = 0;
 		}
 		else if (in[i] == 9) {  // tab
 			x &= ~7;
@@ -304,39 +306,74 @@ void terminal::process_input(const char *const in, const size_t len)
 
 			if (x >= w)
 				x -= w, y++;
+
+			utf8_len = 0;
 		}
 		// ANSI escape handling
 		else if (in[i] == 27 && escape_state == E_NONE)
-			escape_state = E_ESC;
+			escape_state = E_ESC, utf8_len = 0;
 		else if (in[i] == '[' && escape_state == E_ESC)
-			escape_state = E_BRACKET;
+			escape_state = E_BRACKET, utf8_len = 0;
 		else if (((in[i] >= '0' && in[i] <= '9') || in[i] == ';') && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
 			if (escape_state == E_BRACKET)
 				escape_state = E_VALUES;
 
 			escape_value += in[i];
+
+			utf8_len = 0;
 		}
 		else if ((in[i] >= 0x40 && in[i] <= 0x7e) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
 			process_escape(in[i], escape_value);
 
 			escape_state = E_NONE;
 			escape_value.clear();
+
+			utf8_len = 0;
 		}
 		// "regular" text
 		else {
-			screen[y * w + x].c           = in[i];
-			screen[y * w + x].fg_col_ansi = fg_col_ansi;
-			screen[y * w + x].bg_col_ansi = bg_col_ansi;
-			screen[y * w + x].attr        = attr;
+			uint32_t c = uint32_t(-1);
 
-			x++;
+			if (utf8_len) {
+				utf8_code <<= 6;
+				utf8_code |= in[i] & 63;
 
-			if (x == w) {
-				x = 0;
-				y++;
+				utf8_len--;
+
+				if (utf8_len == 0)
+					c = utf8_code;
+			}
+			else if ((in[i] & 0xe0) == 0xc0) {
+				utf8_code = in[i] & 31;
+				utf8_len = 1;
+			}
+			else if ((in[i] & 0xf0) == 0xe0) {
+				utf8_code = in[i] & 15;
+				utf8_len = 2;
+			}
+			else if ((in[i] & 0xf8) == 0xf0) {
+				utf8_code = in[i] & 7;
+				utf8_len = 3;
+			}
+			else {
+				c = in[i];
 			}
 
-			last_character = in[i];
+			if (c != uint32_t(-1)) {
+				screen[y * w + x].c           = c;
+				screen[y * w + x].fg_col_ansi = fg_col_ansi;
+				screen[y * w + x].bg_col_ansi = bg_col_ansi;
+				screen[y * w + x].attr        = attr;
+
+				x++;
+
+				if (x == w) {
+					x = 0;
+					y++;
+				}
+
+				last_character = c;
+			}
 		}
 
 		if (y == h) {
@@ -367,54 +404,43 @@ void terminal::render(uint64_t *const ts_after, uint8_t **const out, int *const 
 
 	*ts_after = latest_update;
 
-	constexpr const int char_w = 8;
-	constexpr const int char_h = 16;
+	const int char_w = f->get_width();
+	const int char_h = f->get_height();
+
+	int pixels_per_row = w * char_w;
 
 	*out = reinterpret_cast<uint8_t *>(calloc(1, w * char_w * h * char_h * 3));
 
-	int pixels_per_row = w * char_w;
-	int bytes_per_row  = pixels_per_row * 3;
+	*out_w = pixels_per_row;
+	*out_h = h * char_h;
 
 	for(int cy=0; cy<h; cy++) {
 		for(int cx=0; cx<w; cx++) {
-			int  offset      = cy * w + cx;
-			char c           = screen[offset].c;
+			int      offset       = cy * w + cx;
+			uint32_t c            = screen[offset].c;
 
-			int  bold        = screen[offset].attr & A_BOLD ? 1 : 0;
+			int      bold         = screen[offset].attr & A_BOLD ? 1 : 0;
 
-			bool inverse     = screen[offset].attr & A_INVERSE;
-
-			int  fg_color    = inverse ? screen[offset].bg_col_ansi : screen[offset].fg_col_ansi;
-			int  bg_color    = inverse ? screen[offset].fg_col_ansi : screen[offset].bg_col_ansi;
+			int      fg_color     = screen[offset].fg_col_ansi;
+			int      bg_color     = screen[offset].bg_col_ansi;
 
 			if (fg_color == bg_color)
 				fg_color = 7, bg_color = 0;
 
-			rgb_t fg         = color_map[bold][fg_color];
-			rgb_t bg         = color_map[0][bg_color];
+			rgb_t    fg           = color_map[bold][fg_color];
+			rgb_t    bg           = color_map[0][bg_color];
 
-			if (c != 0) {
-				const uint8_t *const char_bitmap = f->get_char_pointer(c);
+			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
+			bool     underline    = false;
 
-				for(int py=0; py<16; py++) {
-					uint8_t scanline = char_bitmap[py];
+			int     x            = cx * char_w;
+			int     y            = cy * char_h;
 
-					for(int px=0; px<8; px++) {
-						int  offset = cy * bytes_per_row * char_h + py * bytes_per_row + cx * char_w * 3 + px * 3;
-
-						bool bit    = !!(scanline & (1 << (7 - px)));
-
-						(*out)[offset + 0] = bit ? fg.r : bg.r;
-						(*out)[offset + 1] = bit ? fg.g : bg.g;
-						(*out)[offset + 2] = bit ? fg.b : bg.b;
-					}
-				}
+			if (!f->draw_glyph(c, char_h, inverse, underline, fg, bg, x, y, *out, *out_w, *out_h)) {
+				// TODO
 			}
 		}
 	}
-
-	*out_w = pixels_per_row;
-	*out_h = h * char_h;
 }
 
 char terminal::get_char_at(const int cx, const int cy) const

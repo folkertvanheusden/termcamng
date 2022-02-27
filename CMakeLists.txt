@@ -54,6 +54,16 @@ target_link_libraries(termcamng ${LIBSSH_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${LIBSSH_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${LIBSSH_CFLAGS_OTHER})
 
+pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
+target_link_libraries(termcamng ${FONTCONFIG_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${FONTCONFIG_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${FONTCONFIG_CFLAGS_OTHER})
+
+pkg_check_modules(FREETYPE2 REQUIRED freetype2)
+target_link_libraries(termcamng ${FREETYPE2_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${FREETYPE2_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${FREETYPE2_CFLAGS_OTHER})
+
 CHECK_INCLUDE_FILE(security/pam_appl.h LIBPAM)
 if (LIBPAM)
 	target_link_libraries(termcamng pam)

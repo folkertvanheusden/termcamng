@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "common.h"
 #include "font.h"
 
 
@@ -14,16 +15,11 @@
 typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
 
 typedef struct {
-	char c;
-	int fg_col_ansi, bg_col_ansi;
-	int attr;
+	uint32_t c;
+	int      fg_col_ansi;
+	int      bg_col_ansi;
+	int      attr;
 } pos_t;
-
-typedef struct {
-	int r;
-	int g;
-	int b;
-} rgb_t;
 
 class terminal {
 private:
@@ -39,8 +35,11 @@ private:
 	int               bg_col_ansi { 40 };
 	int               attr        {  0 };
 	rgb_t             color_map[2][8];
-	char              last_character { ' ' };
+	uint32_t          last_character { ' ' };
 	uint64_t          latest_update { 0 };
+	int               utf8_len  { 0 };
+	uint32_t          utf8_code { 0 };
+
 	std::mutex        lock;
 	std::condition_variable cond;
 	std::atomic_bool *const stop_flag;

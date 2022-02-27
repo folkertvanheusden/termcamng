@@ -1,6 +1,10 @@
-font-file: CP850.F16
+font-height: 16
 
-local-output: true
+font-files:
+ - /usr/share/fonts/truetype/unifont/unifont.ttf
+ - /usr/share/wine/fonts/wingding.ttf
+
+local-output: false
 
 fork: false
 
