@@ -15,6 +15,7 @@ add_compile_options(-Wall -pedantic)
 add_executable(termcamng
 	error.cpp
 	font.cpp
+	http.cpp
 	io.cpp
 	logging.cpp
 	main.cpp

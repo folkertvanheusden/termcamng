@@ -24,7 +24,7 @@ ssh-port: 2200
 ssh-keys: keys/
 
 #exec-command: /usr/bin/irssi -c oftc
-exec-command: /usr/bin/htop
+exec-command: /usr/bin/htop -d 5
 directory: /tmp
 
 logging:
