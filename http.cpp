@@ -15,6 +15,7 @@ typedef struct
 	int       compression_level;
 
 	uint64_t  buffer_ts;
+	int       max_wait;
 
 	uint8_t  *buffer;
 	size_t    bytes_in_buffer;
@@ -30,12 +31,12 @@ void *free_parameters(void *cls)
 	return nullptr;
 }
 
-std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts_after, const int compression_level)
+std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts_after, const int max_wait, const int compression_level)
 {
 	uint8_t *out   = nullptr;
 	int      out_w = 0;
 	int      out_h = 0;
-	t->render(ts_after, &out, &out_w, &out_h);
+	t->render(ts_after, max_wait, &out, &out_w, &out_h);
 
 	char *data_out = nullptr;
 	size_t data_out_len = 0;
@@ -56,7 +57,7 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
 
 	if (p->buffer == nullptr) {
-		auto png = get_png_frame(p->t, &p->buffer_ts, p->compression_level);
+		auto png = get_png_frame(p->t, &p->buffer_ts, p->max_wait, p->compression_level);
 
 		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n\r\n", png.second);
 
@@ -107,7 +108,7 @@ MHD_Result get_terminal_png_frame(void *cls,
 
 	if (strcmp(url, "/") == 0) {
 		uint64_t after_ts = 0;
-		auto     png      = get_png_frame(hsp->t, &after_ts, hsp->compression_level);
+		auto     png      = get_png_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
 
 		struct MHD_Response *response = MHD_create_response_from_buffer(png.second, png.first, MHD_RESPMEM_MUST_COPY);
 
@@ -133,6 +134,8 @@ MHD_Result get_terminal_png_frame(void *cls,
 		parameters->t                 = hsp->t;
 
 		parameters->compression_level = hsp->compression_level;
+
+		parameters->max_wait          = hsp->max_wait;
 
 		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, hsp->t->get_width() * hsp->t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
 

@@ -6,6 +6,7 @@
 typedef struct {
 	terminal *t;
 	int       compression_level;
+	int       max_wait;
 } http_server_parameters_t;
 
 struct MHD_Daemon * start_http_server(const int http_port, http_server_parameters_t *const hsp);
