@@ -65,6 +65,11 @@ target_link_libraries(termcamng ${FREETYPE2_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${FREETYPE2_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${FREETYPE2_CFLAGS_OTHER})
 
+pkg_check_modules(LIBJPEG REQUIRED libturbojpeg)
+target_link_libraries(termcamng ${LIBJPEG_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${LIBJPEG_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${LIBJPEG_CFLAGS_OTHER})
+
 CHECK_INCLUDE_FILE(security/pam_appl.h LIBPAM)
 if (LIBPAM)
 	target_link_libraries(termcamng pam)

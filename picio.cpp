@@ -1,9 +1,14 @@
 #include <png.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <turbojpeg.h>
 
 #include "error.h"
+#include "logging.h"
+#include "picio.h"
 
+
+thread_local myjpeg my_jpeg;
 
 static void libpng_error_handler(png_structp png, png_const_charp msg)
 {
@@ -56,4 +61,28 @@ void write_PNG_file(FILE *const fh, const int ncols, const int nrows, const int 
 	png_destroy_write_struct(&png, &info);
 
 	free(row_pointers);
+}
+
+myjpeg::myjpeg()
+{
+	jpegCompressor = tjInitCompress();
+}
+
+myjpeg::~myjpeg()
+{
+	tjDestroy(jpegCompressor);
+}
+
+bool myjpeg::write_JPEG_memory(const int ncols, const int nrows, const int compression_level, const uint8_t *const pixels, uint8_t **out, size_t *out_len)
+{
+	unsigned long int len = 0;
+
+	if (tjCompress2(jpegCompressor, pixels, ncols, 0, nrows, TJPF_RGB, out, &len, TJSAMP_444, 100 - compression_level, TJFLAG_FASTDCT) == -1) {
+		dolog(ll_error, "Failed compressing frame: %s (%dx%d @ %d)", tjGetErrorStr(), ncols, nrows, compression_level);
+		return false;
+	}
+
+	*out_len = len;
+
+	return true;
 }

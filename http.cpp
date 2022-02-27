@@ -12,6 +12,8 @@ typedef struct
 {
 	terminal *t;
 
+	bool      png;
+
 	int       compression_level;
 
 	uint64_t  buffer_ts;
@@ -28,6 +30,23 @@ void *free_parameters(void *cls)
 	free(p);
 
 	return nullptr;
+}
+
+std::pair<uint8_t *, size_t> get_jpeg_frame(terminal *const t, uint64_t *const ts_after, const int compression_level)
+{
+	uint8_t *out   = nullptr;
+	int      out_w = 0;
+	int      out_h = 0;
+	t->render(ts_after, &out, &out_w, &out_h);
+
+	uint8_t *data_out = nullptr;
+	size_t   data_out_len = 0;
+
+	(void)my_jpeg.write_JPEG_memory(out_w, out_h, compression_level, out, &data_out, &data_out_len);
+
+	free(out);
+
+	return { data_out, data_out_len };
 }
 
 std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts_after, const int compression_level)
@@ -56,21 +75,21 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
 
 	if (p->buffer == nullptr) {
-		auto png = get_png_frame(p->t, &p->buffer_ts, p->compression_level);
+		auto image = p->png ? get_png_frame(p->t, &p->buffer_ts, p->compression_level) : get_jpeg_frame(p->t, &p->buffer_ts, p->compression_level);
 
-		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n\r\n", png.second);
+		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", p->png ? "png" : "jpeg", image.second);
 
-		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + png.second));
+		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + image.second));
 		if (!temp)
 			return 0;
 
 		p->buffer = temp;
 
-		memcpy(&p->buffer[header_len], png.first, png.second);
+		memcpy(&p->buffer[header_len], image.first, image.second);
 
-		p->bytes_in_buffer = header_len + png.second;
+		p->bytes_in_buffer = header_len + image.second;
 
-		free(png.first);
+		free(image.first);
 	}
 
 	size_t n_to_copy = std::min(max, p->bytes_in_buffer);
@@ -125,12 +144,14 @@ MHD_Result get_terminal_png_frame(void *cls,
 		return ret;
 	}
 
-	if (strcmp(url, "/stream") == 0) {
+	if (strcmp(url, "/stream") == 0  || strcmp(url, "/stream.mjpeg") == 0) {
 		http_parameters_t *parameters = reinterpret_cast<http_parameters_t *>(calloc(1, sizeof(http_parameters_t)));
 		if (!parameters)
 			return MHD_NO;
 
 		parameters->t                 = hsp->t;
+
+		parameters->png               = strcmp(url, "/stream") == 0;
 
 		parameters->compression_level = hsp->compression_level;
 
