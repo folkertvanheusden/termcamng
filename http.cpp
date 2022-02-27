@@ -82,7 +82,7 @@ ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 
 		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + image.second));
 		if (!temp)
-			return 0;
+			return MHD_CONTENT_READER_END_OF_STREAM;
 
 		p->buffer = temp;
 
