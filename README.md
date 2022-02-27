@@ -63,6 +63,13 @@ screen. Also the Edge browser on windows and Safari on the iPhone
 show the stream correctly.
 
 
+notes
+-----
+
+No "special characters" showing? Make sure the locale of the system
+is set to utf-8.
+
+
 Written by Folkert van Heusden <mail@vanheusden.com>
 
 License: Apache License v2.0
