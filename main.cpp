@@ -127,6 +127,41 @@ std::pair<bool, std::string> authenticate_against_pam(const std::string & userna
 	return { true, "Ok" };
 }
 
+int start_tcp_listen(const std::string & bind_to, const int listen_port)
+{
+	// setup listening socket for viewers
+	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listen_fd == -1)
+		error_exit(true, "start_tcp_listen: cannot create socket");
+
+        int reuse_addr = 1;
+        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr)) == -1)
+                error_exit(true, "start_tcp_listen: setsockopt(SO_REUSEADDR) failed");
+
+	int q_size = SOMAXCONN;
+	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size))
+		error_exit(true, "start_tcp_listen: failed to enable TCP FastOpen");
+
+        struct sockaddr_in server_addr { 0 };
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(listen_port);
+	int rc = inet_pton(AF_INET, bind_to.c_str(), &server_addr.sin_addr);
+
+	if (rc == 0)
+		error_exit(false, "start_tcp_listen: \"%s\" is not a valid IP-address", bind_to.c_str());
+
+	if (rc == -1)
+		error_exit(true, "start_tcp_listen: problem interpreting \"%s\"", bind_to.c_str());
+
+        if (bind(listen_fd, (struct sockaddr *)&server_addr, sizeof server_addr) == -1)
+                error_exit(true, "start_tcp_listen: failed to bind to port %d", listen_port);
+
+        if (listen(listen_fd, q_size) == -1)
+                error_exit(true, "start_tcp_listen: listen failed");
+
+	return listen_fd;
+}
+
 typedef struct
 {
 	std::mutex               lock;
@@ -146,168 +181,180 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 
 	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY, myformat("%s/ssh_host_rsa_key", ssh_keys.c_str()).c_str());
 
-	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDADDR, bind_addr.c_str());
+	int server_fd = start_tcp_listen(bind_addr, port);
 
-	ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
-
-	if (ssh_bind_listen(sshbind) < 0)
-		error_exit(false, "process_ssh: error listening to socket: %s", ssh_get_error(sshbind));
+	struct pollfd fds[] = { { server_fd, POLLIN, 0 } };
 
 	for(;!stop;) {
 		bool err = false;
 
-		// wait for client
-		ssh_session session = ssh_new();
-
-		int r = ssh_bind_accept(sshbind, session);  // TODO unblock
-		if (r == SSH_ERROR) {
-			dolog(ll_warning, "process_ssh: error accepting a connection: %s", ssh_get_error(sshbind));
-			ssh_disconnect(session);
-			ssh_free(session);
+		int prc = poll(fds, 1, 500);
+		if (prc == 0)
 			continue;
-		}
 
-		// authenticate
-		if (ssh_handle_key_exchange(session)) {
-			dolog(ll_warning, "process_ssh: ssh_handle_key_exchange: %s", ssh_get_error(session));
-			ssh_disconnect(session);
-			ssh_free(session);
-			continue;
-		}
+		if (prc == -1)
+			error_exit(true, "process_ssh: poll failed");
 
-		bool        auth_success = false;
-		std::string username;
+		if (fds[0].revents) {
+			// wait for client
+			int client_fd = accept(server_fd, nullptr, nullptr);
+			if (client_fd == -1) {
+				dolog(ll_warning, "process_ssh: error accepting a connection");
+				continue;
+			}
 
-		while(!stop && !auth_success) {
-			ssh_message message = ssh_message_get(session);
-			if (!message)
-				break;
+			ssh_session session = ssh_new();
 
-			ssh_message_auth_set_methods(message, SSH_AUTH_METHOD_PASSWORD);
+			int r = ssh_bind_accept_fd(sshbind, session, client_fd);
+			if (r == SSH_ERROR) {
+				dolog(ll_warning, "process_ssh: error accepting a connection: %s", ssh_get_error(sshbind));
+				ssh_disconnect(session);
+				ssh_free(session);
+				continue;
+			}
 
-			if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
-				const char *requested_user = ssh_message_auth_user(message);
+			// authenticate
+			if (ssh_handle_key_exchange(session)) {
+				dolog(ll_warning, "process_ssh: ssh_handle_key_exchange: %s", ssh_get_error(session));
+				ssh_disconnect(session);
+				ssh_free(session);
+				continue;
+			}
 
-				auto auth_rc =  authenticate_against_pam(requested_user, ssh_message_auth_password(message));
+			bool        auth_success = false;
+			std::string username;
 
-				if (auth_rc.first) {
-					auth_success = true;
+			while(!stop && !auth_success) {
+				ssh_message message = ssh_message_get(session);
+				if (!message)
+					break;
 
-					username = requested_user;
+				ssh_message_auth_set_methods(message, SSH_AUTH_METHOD_PASSWORD);
 
-					ssh_message_auth_reply_success(message, 0);
+				if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
+					const char *requested_user = ssh_message_auth_user(message);
 
+					auto auth_rc =  authenticate_against_pam(requested_user, ssh_message_auth_password(message));
+
+					if (auth_rc.first) {
+						auth_success = true;
+
+						username = requested_user;
+
+						ssh_message_auth_reply_success(message, 0);
+
+						ssh_message_free(message);
+						break;
+					}
+				}
+
+				ssh_message_reply_default(message);
+
+				ssh_message_free(message);
+			}
+
+			if (!auth_success) {
+				ssh_disconnect(session);
+				ssh_free(session);
+				continue;
+			}
+
+			// select a channel
+			ssh_channel channel = nullptr;
+			while(!stop && channel == nullptr) {
+				ssh_message message = ssh_message_get(session);
+
+				if (!message) {
+					err = true;
+					break;
+				}
+
+				if (ssh_message_type(message) == SSH_REQUEST_CHANNEL_OPEN) {
+					if (ssh_message_subtype(message) == SSH_CHANNEL_SESSION)
+						channel = ssh_message_channel_request_open_reply_accept(message);
+				}
+
+				ssh_message_free(message);
+			}
+
+			if (err) {
+				ssh_disconnect(session);
+				ssh_free(session);
+				continue;
+			}
+
+			// wait for shell request
+			while(!stop) {
+				ssh_message message = ssh_message_get(session);
+				if (!message)
+					break;
+
+				if (ssh_message_type(message) == SSH_REQUEST_CHANNEL && ssh_message_subtype(message) == SSH_CHANNEL_REQUEST_SHELL) {
+					ssh_message_channel_request_reply_success(message);
 					ssh_message_free(message);
 					break;
 				}
-			}
 
-			ssh_message_reply_default(message);
-
-			ssh_message_free(message);
-		}
-
-		if (!auth_success) {
-			ssh_disconnect(session);
-			ssh_free(session);
-			continue;
-		}
-
-		// select a channel
-		ssh_channel channel = nullptr;
-		while(!stop && channel == nullptr) {
-			ssh_message message = ssh_message_get(session);
-
-			if (!message) {
-				err = true;
-				break;
-			}
-
-			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL_OPEN) {
-				if (ssh_message_subtype(message) == SSH_CHANNEL_SESSION)
-					channel = ssh_message_channel_request_open_reply_accept(message);
-			}
-
-			ssh_message_free(message);
-		}
-
-		if (err) {
-			ssh_disconnect(session);
-			ssh_free(session);
-			continue;
-		}
-
-		// wait for shell request
-		while(!stop) {
-			ssh_message message = ssh_message_get(session);
-			if (!message)
-				break;
-
-			if (ssh_message_type(message) == SSH_REQUEST_CHANNEL && ssh_message_subtype(message) == SSH_CHANNEL_REQUEST_SHELL) {
-				ssh_message_channel_request_reply_success(message);
 				ssh_message_free(message);
-				break;
 			}
 
-			ssh_message_free(message);
+			std::thread client_thread([session, username, channel, clients, t, program_fd] {
+					set_thread_name("ssh-" + username);
+
+					std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
+
+					std::unique_lock<std::mutex> lck(clients->lock);
+
+					client_t *client = new client_t();
+					auto it_client = clients->clients.insert({ user_key, client });
+
+					lck.unlock();
+
+					std::string setup   = setup_telnet_session();
+
+					std::string data    = generate_initial_screen(t);
+
+					std::string initial = setup + data;
+
+					ssh_channel_write(channel, initial.c_str(), initial.size());
+
+					while(!stop && !ssh_channel_is_eof(channel)) {
+						// read from ssh, transmit to terminal
+						char buffer[4096];
+
+						int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
+
+						if (i > 0) {
+							if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
+								break;
+						}
+
+						// transmit any queued traffic
+						std::unique_lock<std::mutex> lck(it_client.first->second->lock);
+						while(!it_client.first->second->queue.empty()) {
+							std::string data = it_client.first->second->queue.at(0);
+
+							it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
+
+							ssh_channel_write(channel, data.c_str(), data.size());
+						}
+
+						lck.unlock();
+					}
+
+					ssh_disconnect(session);
+					ssh_free(session);
+
+					// unregister client from queues
+					lck.lock();
+
+					clients->clients.erase(user_key);
+
+					delete client;
+			});
+
+			client_thread.detach();
 		}
-
-		std::thread client_thread([session, username, channel, clients, t, program_fd] {
-			set_thread_name("ssh-" + username);
-
-			std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
-
-			std::unique_lock<std::mutex> lck(clients->lock);
-
-			client_t *client = new client_t();
-			auto it_client = clients->clients.insert({ user_key, client });
-
-			lck.unlock();
-
-			std::string setup   = setup_telnet_session();
-
-			std::string data    = generate_initial_screen(t);
-
-			std::string initial = setup + data;
-
-			ssh_channel_write(channel, initial.c_str(), initial.size());
-
-			while(!stop && !ssh_channel_is_eof(channel)) {
-				// read from ssh, transmit to terminal
-				char buffer[4096];
-
-				int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
-
-				if (i > 0) {
-					if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
-						break;
-				}
-
-				// transmit any queued traffic
-				std::unique_lock<std::mutex> lck(it_client.first->second->lock);
-				while(!it_client.first->second->queue.empty()) {
-					std::string data = it_client.first->second->queue.at(0);
-
-					it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
-
-					ssh_channel_write(channel, data.c_str(), data.size());
-				}
-
-				lck.unlock();
-			}
-
-			ssh_disconnect(session);
-			ssh_free(session);
-
-			// unregister client from queues
-			lck.lock();
-
-			clients->clients.erase(user_key);
-
-			delete client;
-		});
-
-		client_thread.detach();
 	}
 
 	ssh_finalize();
@@ -320,34 +367,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 	int client_fd = -1;
 
 	// setup listening socket for viewers
-	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd == -1)
-		error_exit(true, "process_telnet: cannot create socket");
-
-        int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr)) == -1)
-                error_exit(true, "process_telnet: setsockopt(SO_REUSEADDR) failed");
-
-	int q_size = SOMAXCONN;
-	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size))
-		error_exit(true, "process_telnet: failed to enable TCP FastOpen");
-
-        struct sockaddr_in server_addr { 0 };
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(listen_port);
-	int rc = inet_pton(AF_INET, bind_to.c_str(), &server_addr.sin_addr);
-
-	if (rc == 0)
-		error_exit(false, "process_telnet: \"%s\" is not a valid IP-address", bind_to.c_str());
-
-	if (rc == -1)
-		error_exit(true, "process_telnet: problem interpreting \"%s\"", bind_to.c_str());
-
-        if (bind(listen_fd, (struct sockaddr *)&server_addr, sizeof server_addr) == -1)
-                error_exit(true, "process_telnet: failed to bind to port %d", listen_port);
-
-        if (listen(listen_fd, q_size) == -1)
-                error_exit(true, "process_telnet: listen failed");
+	int listen_fd = start_tcp_listen(bind_to, listen_port);
 
 	// only 1 telnet user concurrently currently
 	std::unique_lock<std::mutex> lck(clients->lock);
@@ -552,11 +572,13 @@ std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts
 	return { reinterpret_cast<uint8_t *>(data_out), data_out_len };
 }
 
+#include "time.h"
 ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
 {
 	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
 
 	if (p->buffer == nullptr) {
+		printf("%.3f\n", get_ms() / 1000.0);
 		auto png = get_png_frame(p->t, &p->buffer_ts);
 
 		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "--12345\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n\r\n", png.second);
