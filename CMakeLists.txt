@@ -16,9 +16,11 @@ add_executable(termcamng
 	error.cpp
 	font.cpp
 	http.cpp
+	httpd.cpp
 	io.cpp
 	logging.cpp
 	main.cpp
+	net.cpp
 	picio.cpp
 	proc.cpp
 	str.cpp
@@ -39,11 +41,6 @@ pkg_check_modules(LIBPNG REQUIRED libpng)
 target_link_libraries(termcamng ${LIBPNG_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${LIBPNG_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${LIBPNG_CFLAGS_OTHER})
-
-pkg_check_modules(LIBMICROHTTPD REQUIRED libmicrohttpd)
-target_link_libraries(termcamng ${LIBMICROHTTPD_LIBRARIES})
-target_include_directories(termcamng PUBLIC ${LIBMICROHTTPD_INCLUDE_DIRS})
-target_compile_options(termcamng PUBLIC ${LIBMICROHTTPD_CFLAGS_OTHER})
 
 pkg_check_modules(YAML REQUIRED yaml-cpp)
 target_link_libraries(termcamng ${YAML_LIBRARIES})

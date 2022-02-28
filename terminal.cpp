@@ -395,7 +395,7 @@ void terminal::process_input(const std::string & in)
 	process_input(in.c_str(), in.size());
 }
 
-void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h)
+void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const
 {
 	uint64_t start_wait = get_ms();
 

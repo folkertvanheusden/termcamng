@@ -13,7 +13,6 @@ database of the Linux system.
 required
 --------
 
- * libmicrohttpd-dev
  * libpam0g-dev
  * libpng-dev
  * libssh-dev

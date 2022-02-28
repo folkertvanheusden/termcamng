@@ -1,37 +1,15 @@
-#include <microhttpd.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "http.h"
+#include "io.h"
 #include "picio.h"
+#include "str.h"
 #include "terminal.h"
 
 
-typedef struct
-{
-	terminal *t;
-
-	bool      png;
-
-	int       compression_level;
-
-	uint64_t  buffer_ts;
-	int       max_wait;
-
-	uint8_t  *buffer;
-	size_t    bytes_in_buffer;
-} http_parameters_t;
-
-void *free_parameters(void *cls)
-{
-	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
-
-	free(p->buffer);
-	free(p);
-
-	return nullptr;
-}
+typedef enum { sct_none, sct_mjpeg, sct_mpng } stream_content_type_t;
 
 std::pair<uint8_t *, size_t> get_jpeg_frame(terminal *const t, uint64_t *const ts_after, const int max_wait, const int compression_level)
 {
@@ -71,59 +49,12 @@ std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts
 	return { reinterpret_cast<uint8_t *>(data_out), data_out_len };
 }
 
-ssize_t stream_producer(void *cls, uint64_t pos, char *buf, size_t max)
+void get_html_root(const std::string url, const int fd, const void *const parameters)
 {
-	http_parameters_t *p = reinterpret_cast<http_parameters_t *>(cls);
-
-	if (p->buffer == nullptr) {
-		auto image = p->png ? get_png_frame(p->t, &p->buffer_ts, p->max_wait, p->compression_level) : get_jpeg_frame(p->t, &p->buffer_ts, p->max_wait, p->compression_level);
-
-		int header_len = asprintf(reinterpret_cast<char **>(&p->buffer), "\r\n--12345\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", p->png ? "png" : "jpeg", image.second);
-
-		uint8_t *temp = reinterpret_cast<uint8_t *>(realloc(p->buffer, header_len + image.second));
-		if (!temp)
-			return MHD_CONTENT_READER_END_OF_STREAM;
-
-		p->buffer = temp;
-
-		memcpy(&p->buffer[header_len], image.first, image.second);
-
-		p->bytes_in_buffer = header_len + image.second;
-
-		free(image.first);
-	}
-
-	size_t n_to_copy = std::min(max, p->bytes_in_buffer);
-
-	memcpy(buf, p->buffer, n_to_copy);
-
-	size_t left = p->bytes_in_buffer - n_to_copy;
-	if (left > 0) {
-		memmove(&p->buffer[0], &p->buffer[n_to_copy], left);
-
-		p->bytes_in_buffer -= left;
-	}
-	else {
-		free(p->buffer);
-		p->buffer = nullptr;
-
-		p->bytes_in_buffer = 0;
-	}
-
-	return n_to_copy;
-}
-
-MHD_Result get_terminal_png_frame(void *cls,
-		struct MHD_Connection *connection,
-		const char *url,
-		const char *method,
-		const char *version,
-		const char *upload_data, size_t *upload_data_size, void **ptr)
-{
-	http_server_parameters_t *const hsp = reinterpret_cast<http_server_parameters_t *>(cls);
-
-	if (strcmp(url, "/") == 0) {
-		std::string page = 
+	std::string reply = 
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: text/html\r\n"
+			"\r\n"
 			"<!DOCTYPE html>"
 			"<html lang=\"en\">"
 			"<body>"
@@ -131,110 +62,120 @@ MHD_Result get_terminal_png_frame(void *cls,
 			"</body>"
 			"</html>";
 
-		struct MHD_Response *response = MHD_create_response_from_buffer(page.size(), const_cast<char *>(page.c_str()), MHD_RESPMEM_MUST_COPY);
-
-		MHD_Result ret = MHD_NO;
-
-		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "text/html") == MHD_NO)
-			ret = MHD_NO;
-		else
-			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-
-		MHD_destroy_response(response);
-
-		return ret;
-	}
-
-	if (strcmp(url, "/frame.png") == 0) {
-		uint64_t after_ts = 0;
-		auto     png      = get_png_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
-
-		struct MHD_Response *response = MHD_create_response_from_buffer(png.second, png.first, MHD_RESPMEM_MUST_COPY);
-
-		free(png.first);
-
-		MHD_Result ret = MHD_NO;
-
-		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/png") == MHD_NO)
-			ret = MHD_NO;
-		else
-			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-
-		MHD_destroy_response(response);
-
-		return ret;
-	}
-
-	if (strcmp(url, "/frame.jpeg") == 0) {
-		uint64_t after_ts = 0;
-		auto     jpeg     = get_jpeg_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
-
-		struct MHD_Response *response = MHD_create_response_from_buffer(jpeg.second, jpeg.first, MHD_RESPMEM_MUST_COPY);
-
-		free(jpeg.first);
-
-		MHD_Result ret = MHD_NO;
-
-		if (MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/jpeg") == MHD_NO)
-			ret = MHD_NO;
-		else
-			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-
-		MHD_destroy_response(response);
-
-		return ret;
-	}
-
-	if (strcmp(url, "/stream.mpng") == 0  || strcmp(url, "/stream.mjpeg") == 0) {
-		http_parameters_t *parameters = reinterpret_cast<http_parameters_t *>(calloc(1, sizeof(http_parameters_t)));
-		if (!parameters)
-			return MHD_NO;
-
-		parameters->t                 = hsp->t;
-
-		parameters->png               = strcmp(url, "/stream.mpng") == 0;
-
-		parameters->compression_level = hsp->compression_level;
-
-		parameters->max_wait          = hsp->max_wait;
-
-		struct MHD_Response *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, hsp->t->get_width() * hsp->t->get_height() * 3 * 2, &stream_producer, parameters, reinterpret_cast<MHD_ContentReaderFreeCallback>(free_parameters));
-
-		MHD_Result ret = MHD_YES;
-
-		if (ret == MHD_YES)
-			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "multipart/x-mixed-replace;boundary=\"--12345\"");
-
-		if (ret == MHD_YES)
-			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_PRAGMA, "no-cache");
-
-		if (ret == MHD_YES)
-			ret = MHD_add_response_header(response, MHD_HTTP_HEADER_CACHE_CONTROL, "no-store");
-
-		if (ret == MHD_YES)
-			ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-
-		MHD_destroy_response(response);
-
-		return ret;
-	}
-
-	struct MHD_Response *response = MHD_create_response_from_buffer(0, nullptr, MHD_RESPMEM_MUST_COPY);
-
-	return MHD_queue_response(connection, 404, response);
+	WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-struct MHD_Daemon * start_http_server(const int http_port, http_server_parameters_t *const hsp)
+void get_frame_jpeg(const std::string url, const int fd, const void *const parameters)
 {
-	return MHD_start_daemon(
-			MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG,
-			http_port,
-			nullptr, nullptr, &get_terminal_png_frame, reinterpret_cast<void *>(hsp),
-			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
-			MHD_OPTION_END);
+	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
+
+	uint64_t after_ts = 0;
+	auto     jpeg     = get_jpeg_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
+
+	std::string reply =
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: image/jpeg\r\n"
+			"\r\n";
+
+	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) == reply.size())
+		WRITE(fd, jpeg.first, jpeg.second);
+
+	free(jpeg.first);
 }
 
-void stop_http_server(struct MHD_Daemon *const d)
+void get_frame_png(const std::string url, const int fd, const void *const parameters)
 {
-	MHD_stop_daemon(d);
+	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
+
+	uint64_t after_ts = 0;
+	auto     png      = get_png_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
+
+	std::string reply =
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: image/png\r\n"
+			"\r\n";
+
+	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) == reply.size())
+		WRITE(fd, png.first, png.second);
+
+	free(png.first);
+}
+
+void stream_frames(const int fd, const http_server_parameters_t *const parameters, const stream_content_type_t type)
+{
+	std::string reply =
+		"HTTP/1.0 200 OK\r\n"
+		"Cache-Control: no-cache\r\n"
+		"Pragma: no-cache\r\n"
+		"Server: TermCamNG\r\n"
+		"Expires: Thu, 01 Dec 1994 16:00:00 GMT\r\n"
+		"Connection: close\r\n"
+		"Content-Type: multipart/x-mixed-replace; boundary=myboundary\r\n"
+		"\r\n";
+
+	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) != reply.size())
+		return;
+
+	uint64_t ts = 0;
+
+	for(;;) {
+		auto image = type == sct_mpng ? get_png_frame(parameters->t, &ts, parameters->max_wait, parameters->compression_level) : get_jpeg_frame(parameters->t, &ts, parameters->max_wait, parameters->compression_level);
+
+		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", type == sct_mpng ? "png" : "jpeg", image.second);
+
+		if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) != reply.size()) {
+			free(image.first);
+
+			break;
+		}
+
+		if (size_t(WRITE(fd, image.first, image.second)) != image.second) {
+			free(image.first);
+
+			break;
+		}
+
+		free(image.first);
+	}
+}
+
+void get_stream(const std::string url, const int fd, const void *const parameters)
+{
+	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
+
+	std::size_t dot = url.rfind('.');
+
+	if (dot == std::string::npos)
+		return;
+
+	const std::string extension = url.substr(dot + 1);
+
+	stream_content_type_t sct = sct_none;
+
+	if (extension == "mjpeg")
+		sct = sct_mjpeg;
+	else if (extension == "mpng")
+		sct = sct_mpng;
+
+	if (sct != sct_none)
+		stream_frames(fd, hsp, sct);
+}
+
+httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp)
+{
+	std::map<std::string, std::function<void (const std::string url, const int fd, const void *)> > url_map;
+
+	url_map.insert({ "/",             get_html_root });
+	url_map.insert({ "/index.html",   get_html_root });
+	url_map.insert({ "/frame.jpeg",   get_frame_jpeg });
+	url_map.insert({ "/frame.png",    get_frame_png });
+	url_map.insert({ "/stream.mjpeg", get_stream });
+	url_map.insert({ "/stream.mpng",  get_stream });
+
+	return new httpd(bind_ip, http_port, url_map, hsp);
+}
+
+void stop_http_server(httpd *const h)
+{
+	delete h;
 }
