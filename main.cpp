@@ -394,7 +394,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
 
 			if (client_fd != -1) {
-				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
+				if (size_t(WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size())) != data.size()) {
 					close(client_fd);
 
 					client_fd = -1;
@@ -428,7 +428,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 			std::string initial = setup + data;
 
-			if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size()) != ssize_t(initial.size())) {
+			if (size_t(WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size())) != initial.size()) {
 				close(client_fd);
 				client_fd = -1;
 			}
