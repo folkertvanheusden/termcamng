@@ -17,6 +17,7 @@ telnet-addr: 127.0.0.1
 # set to 0 to disable
 telnet-port: 2300
 
+http-addr: 127.0.0.1
 http-port: 8080
 
 # set to 0 to let the server only transmit a

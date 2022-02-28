@@ -23,6 +23,7 @@
 #include "http.h"
 #include "io.h"
 #include "logging.h"
+#include "net.h"
 #include "picio.h"
 #include "proc.h"
 #include "str.h"
@@ -125,41 +126,6 @@ std::pair<bool, std::string> authenticate_against_pam(const std::string & userna
 		return { false, "PAM error" };
 
 	return { true, "Ok" };
-}
-
-int start_tcp_listen(const std::string & bind_to, const int listen_port)
-{
-	// setup listening socket for viewers
-	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd == -1)
-		error_exit(true, "start_tcp_listen: cannot create socket");
-
-        int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr)) == -1)
-                error_exit(true, "start_tcp_listen: setsockopt(SO_REUSEADDR) failed");
-
-	int q_size = SOMAXCONN;
-	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size))
-		error_exit(true, "start_tcp_listen: failed to enable TCP FastOpen");
-
-        struct sockaddr_in server_addr { 0 };
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(listen_port);
-	int rc = inet_pton(AF_INET, bind_to.c_str(), &server_addr.sin_addr);
-
-	if (rc == 0)
-		error_exit(false, "start_tcp_listen: \"%s\" is not a valid IP-address", bind_to.c_str());
-
-	if (rc == -1)
-		error_exit(true, "start_tcp_listen: problem interpreting \"%s\"", bind_to.c_str());
-
-        if (bind(listen_fd, (struct sockaddr *)&server_addr, sizeof server_addr) == -1)
-                error_exit(true, "start_tcp_listen: failed to bind to port %d", listen_port);
-
-        if (listen(listen_fd, q_size) == -1)
-                error_exit(true, "start_tcp_listen: listen failed");
-
-	return listen_fd;
 }
 
 typedef struct
@@ -562,6 +528,7 @@ int main(int argc, char *argv[])
 	const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
 	const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
 
+	const std::string http_bind   = yaml_get_string(config, "http-addr",    "network interface (IP address) to let the http port bind to");
 	const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
 
 	const int minimum_fps         = yaml_get_int(config,    "minimum-fps",  "minimum number of frame per second; set to 0 to not control this");
@@ -573,7 +540,8 @@ int main(int argc, char *argv[])
 	const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
 	const bool do_fork            = yaml_get_bool(config,   "fork",         "fork into the background");
 
-	signal(SIGINT, signal_handler);
+	signal(SIGINT,  signal_handler);
+	signal(SIGPIPE, SIG_IGN);
 
 	terminal t(&f, width, height, &stop);
 
@@ -621,7 +589,7 @@ int main(int argc, char *argv[])
 	server_parameters.compression_level = compression_level;
 	server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
-	MHD_Daemon *d = start_http_server(http_port, &server_parameters);
+	httpd *h = start_http_server(http_bind, http_port, &server_parameters);
 
 	while(!stop)
 		sleep(1);
@@ -632,7 +600,7 @@ int main(int argc, char *argv[])
 
 	read_program.join();
 
-	stop_http_server(d);
+	stop_http_server(h);
 
 	return 0;
 }

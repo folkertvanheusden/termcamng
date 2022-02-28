@@ -395,13 +395,13 @@ void terminal::process_input(const std::string & in)
 	process_input(in.c_str(), in.size());
 }
 
-void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h)
+void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const
 {
 	uint64_t start_wait = get_ms();
 
 	std::unique_lock<std::mutex> lck(lock);
 
-	while(latest_update <= *ts_after && !*stop_flag && (get_ms() - start_wait < max_wait || max_wait <= 0)) {
+	while(latest_update <= *ts_after && !*stop_flag && (get_ms() - start_wait < uint64_t(max_wait) || max_wait <= 0)) {
 		int wait_for_delay = 500;
 
 		if (max_wait > 0) {
