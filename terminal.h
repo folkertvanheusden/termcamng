@@ -41,9 +41,9 @@ private:
 	int               utf8_len  { 0 };
 	uint32_t          utf8_code { 0 };
 
-	std::mutex        lock;
-	std::condition_variable cond;
-	std::atomic_bool *const stop_flag;
+	mutable std::mutex              lock;
+	mutable std::condition_variable cond;
+	std::atomic_bool         *const stop_flag;
 
 public:
 	terminal(font *const f, const int w, const int h, std::atomic_bool *const stop_flag);
@@ -71,5 +71,5 @@ public:
 	void process_input(const char *const in, const size_t len);
 	void process_input(const std::string & in);
 
-	void render(uint64_t *const ts_after, uint8_t **const out, int *const out_w, int *const out_h);
+	void render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const;
 };
