@@ -13,7 +13,6 @@ database of the Linux system.
 required
 --------
 
- * libmicrohttpd-dev
  * libpam0g-dev
  * libpng-dev
  * libssh-dev
@@ -42,14 +41,10 @@ to work (see "ssh-keygen -A").
 http
 ----
 
- * http://ip-adres/        <-- 1 PNG frame
- * http://ip-adres/stream  <-- stream of PNG images
-
-
-files
------
-
-CP850.F16 comes from https://github.com/viler-int10h/vga-text-mode-fonts/releases/download/2020-11-25/VGAfonts-20-11-25-NO-previews.zip
+ * http://ip-adres/frame.png     <-- 1 PNG frame
+ * http://ip-adres/stream.mpng   <-- stream of PNG images
+ * http://ip-adres/frame.jpeg    <-- 1 JPEG frame
+ * http://ip-adres/stream.mjpeg  <-- MJPEG stream
 
 
 demo
