@@ -37,7 +37,7 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 	for(UChar32 c = 32; c < 127; c++) {
 		int glyph_index   = FT_Get_Char_Index(faces.at(0), c);
 
-		if (FT_Load_Glyph(faces.at(0), glyph_index, FT_LOAD_RENDER) == 0) {
+		if (FT_Load_Glyph(faces.at(0), glyph_index, 0) == 0) {
 			font_width   = std::max(font_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);
 
 			max_ascender = std::max(max_ascender, int(faces.at(0)->glyph->metrics.horiBearingY));
