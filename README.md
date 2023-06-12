@@ -64,6 +64,9 @@ notes
 No "special characters" showing? Make sure the locale of the system
 is set to utf-8.
 
+If you're interested in video-streaming, you may be interested in
+https://vanheusden.com/constatus/ as well.
+
 
 Written by Folkert van Heusden <mail@vanheusden.com>
 
