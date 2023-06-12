@@ -162,7 +162,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		else if (x >= w)
 			x = w - 1;
 	}
-	else if (cmd == 'H') {  // set position
+	else if (cmd == 'H' || cmd == 'f') {  // set position
 		y = par1.has_value() ? par1.value() - 1 : 0;
 
 		if (y < 0)
