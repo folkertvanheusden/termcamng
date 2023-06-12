@@ -18,6 +18,9 @@ required
  * libssh-dev
  * libyaml-cpp-dev
 
+In the example yaml-file (configuration-file) the fonts from the
+debian fonts-unifont and fonts-wine packages are used.
+
 
 creating
 --------

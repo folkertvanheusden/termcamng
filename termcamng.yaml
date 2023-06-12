@@ -1,7 +1,7 @@
 font-height: 16
 
 font-files:
- - /usr/share/fonts/truetype/unifont/unifont.ttf
+ - /usr/share/fonts/truetype/unifont/unifont_sample.ttf
  - /usr/share/wine/fonts/wingding.ttf
 
 local-output: false
@@ -17,6 +17,12 @@ telnet-addr: 127.0.0.1
 # set to 0 to disable
 telnet-port: 2300
 
+# refresh whole screen in telnet/ssh sessions instead of
+# incremental. this to resolve incompatibilities when the
+# resolution of the program in termcamng differs from the
+# resolution of the telnet-session
+dumb-telnet: true
+
 http-addr: 127.0.0.1
 http-port: 8080
 
@@ -31,6 +37,7 @@ ssh-port: 2200
 ssh-keys: keys/
 
 #exec-command: /usr/bin/irssi -c oftc
+#exec-command: /usr/bin/httping -Q -K 192.168.64.100
 exec-command: /usr/bin/htop -d 5
 directory: /tmp
 
