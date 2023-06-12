@@ -99,11 +99,11 @@ void terminal::delete_character(const int n)
 	}
 }
 
-void terminal::process_escape(const char cmd, const std::string & parameters)
+std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters)
 {
-	std::vector<std::string> pars = split(parameters, ";");
+	std::optional<std::string> send_back;
 
-	printf("%c %s\n", cmd, parameters.c_str());
+	std::vector<std::string> pars = split(parameters, ";");
 
 	std::optional<int> par1;
 	std::optional<int> par2;
@@ -269,6 +269,15 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 			}
 		}
 	}
+	else if (cmd == 'n') {  // device status report (DSR)
+		if (par1 == 5)  // status report
+			send_back = "\033[0n";  // OK
+		else if (par1 == 6)  // report cursor position (CPR) [row;column]
+			send_back = myformat("\033[%d;%dR", y + 1, x + 1);
+		else {
+			dolog(ll_info, "code %d for 'n' not supported", par1);
+		}
+	}
 	else if (cmd == 'X') {  // erase character
 		int offset = y * w + x;
 
@@ -291,10 +300,14 @@ void terminal::process_escape(const char cmd, const std::string & parameters)
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
 	}
+
+	return send_back;
 }
 
-void terminal::process_input(const char *const in, const size_t len)
+std::optional<std::string> terminal::process_input(const char *const in, const size_t len)
 {
+	std::optional<std::string> send_back;
+
 	for(size_t i=0; i<len; i++) {
 		if (in[i] == 13)  // carriage return
 			x = 0, utf8_len = 0;
@@ -331,7 +344,7 @@ void terminal::process_input(const char *const in, const size_t len)
 			utf8_len = 0;
 		}
 		else if ((in[i] >= 0x40 && in[i] <= 0x7e) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
-			process_escape(in[i], escape_value);
+			send_back = process_escape(in[i], escape_value);
 
 			escape_state = E_NONE;
 			escape_value.clear();
@@ -396,11 +409,13 @@ void terminal::process_input(const char *const in, const size_t len)
 	latest_update = get_ms();
 
 	cond.notify_all();
+
+	return send_back;
 }
 
-void terminal::process_input(const std::string & in)
+std::optional<std::string> terminal::process_input(const std::string & in)
 {
-	process_input(in.c_str(), in.size());
+	return process_input(in.c_str(), in.size());
 }
 
 void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const

@@ -501,7 +501,14 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 			}
 
 			if (rrc > 0) {
-				t->process_input(buffer, rrc);
+				auto send_back = t->process_input(buffer, rrc);
+
+				if (send_back.has_value()) {
+					if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(send_back.value().c_str()), send_back.value().size()) != ssize_t(send_back.value().size())) {
+						dolog(ll_warning, "read_and_distribute_program: problem responding to program %s", rrc ? strerror(errno) : "");
+						break;
+					}
+				}
 
 				std::string data(buffer, rrc);
 

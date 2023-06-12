@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <mutex>
+#include <optional>
 #include <stdint.h>
 #include <string>
 
@@ -66,10 +67,10 @@ public:
 	void erase_cell(const int x, const int y);
 	void erase_line(const int cy);
 
-	void process_escape(const char cmd, const std::string & parameters);
+	std::optional<std::string> process_escape(const char cmd, const std::string & parameters);
 
-	void process_input(const char *const in, const size_t len);
-	void process_input(const std::string & in);
+	std::optional<std::string> process_input(const char *const in, const size_t len);
+	std::optional<std::string> process_input(const std::string & in);
 
 	void render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const;
 };
