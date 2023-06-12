@@ -59,7 +59,7 @@ std::string generate_initial_screen(terminal *const t)
 		for(int x=0; x<cur_w; x++) {
 			pos_t c = t->get_cell_at(x, y);
 
-			out += myformat("\033[%d;%dm%c", c.fg_col_ansi, c.bg_col_ansi, c.c);
+			out += myformat("\033[%d;%dm%c", c.fg_col_ansi, c.bg_col_ansi, c.c ? c.c : ' ');
 		}
 	}
 
@@ -140,7 +140,7 @@ typedef struct
 	std::map<std::string, client_t *> clients;
 } clients_t;
 
-void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, clients_t *const clients)
+void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, const bool dumb_telnet, clients_t *const clients)
 {
 	// setup ssh server
 	ssh_bind sshbind = ssh_bind_new();
@@ -264,7 +264,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 				ssh_message_free(message);
 			}
 
-			std::thread client_thread([session, username, channel, clients, t, program_fd] {
+			std::thread client_thread([session, username, channel, clients, t, program_fd, dumb_telnet] {
 					set_thread_name("ssh-" + username);
 
 					std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
@@ -296,16 +296,27 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 						}
 
 						// transmit any queued traffic
+						bool dumb_refresh = false;
+
 						std::unique_lock<std::mutex> lck(it_client.first->second->lock);
 						while(!it_client.first->second->queue.empty()) {
 							std::string data = it_client.first->second->queue.at(0);
 
 							it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
 
-							ssh_channel_write(channel, data.c_str(), data.size());
+							if (!dumb_telnet)
+								ssh_channel_write(channel, data.c_str(), data.size());
+
+							dumb_refresh = true;
 						}
 
 						lck.unlock();
+
+						if (dumb_refresh && dumb_telnet) {
+							std::string data = generate_initial_screen(t);
+
+							ssh_channel_write(channel, data.c_str(), data.size());
+						}
 					}
 
 					ssh_disconnect(session);
@@ -328,7 +339,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 	printf("process_ssh: thread terminating\n");
 }
 
-void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, clients_t *const clients)
+void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, clients_t *const clients)
 {
 	int client_fd = -1;
 
@@ -353,13 +364,17 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 		int rc = poll(fds, client_fd != -1 ? 2 : 1, 100);
 
 		// transmit any queued traffic
+		bool dumb_refresh = false;
+
 		std::unique_lock<std::mutex> lck(it_client.first->second->lock);
 		while(!it_client.first->second->queue.empty()) {
 			std::string data = it_client.first->second->queue.at(0);
 
 			it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
 
-			if (client_fd != -1) {
+			dumb_refresh = true;
+
+			if (client_fd != -1 && dumb_telnet == false) {
 				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
 					close(client_fd);
 
@@ -369,6 +384,15 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 		}
 
 		lck.unlock();
+
+		if (dumb_refresh && dumb_telnet) {
+			std::string data = generate_initial_screen(t);
+
+			if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
+				close(client_fd);
+				client_fd = -1;
+			}
+		}
 
 		if (rc == 0)
 			continue;
@@ -540,6 +564,8 @@ int main(int argc, char *argv[])
 	const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
 	const bool do_fork            = yaml_get_bool(config,   "fork",         "fork into the background");
 
+	const bool dumb_telnet        = yaml_get_bool(config,   "dumb-telnet",  "dumb, slow refresh for telnet sessions; this may increase compatibility with differing resolutions");
+
 	signal(SIGINT,  signal_handler);
 	signal(SIGPIPE, SIG_IGN);
 
@@ -570,18 +596,18 @@ int main(int argc, char *argv[])
 
 	std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
-	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, &clients] {
+	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, &clients] {
 			set_thread_name("telnet");
 
 			if (telnet_port != 0)
-				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, &clients);
+				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, &clients);
 				});
 
-	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, &clients] {
+	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, &clients] {
 			set_thread_name("ssh");
 
 			if (ssh_port != 0)
-				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, &clients);
+				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, &clients);
 				});
 
 	http_server_parameters_t server_parameters { 0 };

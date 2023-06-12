@@ -57,57 +57,97 @@ font::~font()
 
 void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const bool invert, const bool underline, uint8_t *const dest, const int dest_width, const int dest_height)
 {
-	const int bytes  = dest_width * dest_height * 3;
+	const int bytes = dest_width * dest_height * 3;
 
-	int       startx = x < 0 ? -x : 0;
+	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
+		for(unsigned int yo=0; yo<bitmap->rows; yo++) {
+			int yu = yo + y;
 
-	int       endx   = bitmap->width;
+			if (yu < 0)
+				continue;
 
-	for(unsigned int yo=0; yo<bitmap->rows; yo++) {
-		int yu = yo + y;
+			if (yu >= dest_height)
+				break;
 
-		if (yu < 0)
-			continue;
+			// assuming width is always multiple of 8
+			for(unsigned xo=0; xo<bitmap->width / 8; xo++) {
+				int io = yo * bitmap->width / 8 + xo;
 
-		if (yu >= dest_height)
-			break;
+				uint8_t b = bitmap->buffer[io];
 
-		for(int xo=startx; xo<endx; xo++) {
-			int xu = xo + x;
+				int o  = yu * dest_width * 3 + x * 3;
 
-			int o = yu * dest_width * 3 + xu * 3;
+				for(int xbit=0; xbit < 8; xbit++) {
+					int pixel_v = b & 128 ? 255 : 0;
 
-			int pixel_v = bitmap->buffer[yo * bitmap->width + xo];
+					b <<= 1;
 
-			if (invert)
-				pixel_v = 255 - pixel_v;
+					if (invert)
+						pixel_v = 255 - pixel_v;
 
-			int sub = 255 - pixel_v;
+					int sub = 255 - pixel_v;
 
-			dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
-			dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
-			dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+					dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+					dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+					dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+
+					o += 3;
+				}
+			}
 		}
 	}
+	else if (bitmap->pixel_mode == FT_PIXEL_MODE_GRAY) {
+		for(unsigned int yo=0; yo<bitmap->rows; yo++) {
+			int yu = yo + y;
 
-	if (underline) {
-		int pixel_v = invert ? 0 : 255;
+			if (yu < 0)
+				continue;
 
-		for(int yo=0; yo<height; yo++) {
-			for(unsigned int xo=0; xo<bitmap->width; xo++) {
+			if (yu >= dest_height)
+				break;
+
+			for(unsigned xo=0; xo<bitmap->width; xo++) {
 				int xu = xo + x;
 
-				if (xu >= endx)
+				if (xu >= dest_width)
 					break;
 
-				int o = (y + height - (1 + yo)) * dest_width * 3 + xu * 3;
+				int o  = yu * dest_width * 3 + xu * 3;
 
-				if (o + 2 >= bytes)
-					continue;
+				int io = yo * bitmap->width + xo;
 
-				dest[o + 0] = (pixel_v * fg.r) >> 8;
-				dest[o + 1] = (pixel_v * fg.g) >> 8;
-				dest[o + 2] = (pixel_v * fg.b) >> 8;
+				int pixel_v = bitmap->buffer[io];
+
+				if (invert)
+					pixel_v = 255 - pixel_v;
+
+				int sub = 255 - pixel_v;
+
+				dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+				dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+				dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+			}
+		}
+
+		if (underline) {
+			int pixel_v = invert ? 0 : 255;
+
+			for(int yo=0; yo<height; yo++) {
+				for(unsigned int xo=0; xo<bitmap->width; xo++) {
+					int xu = xo + x;
+
+					if (xu >= dest_width)
+						break;
+
+					int o = (y + height - (1 + yo)) * dest_width * 3 + xu * 3;
+
+					if (o + 2 >= bytes)
+						continue;
+
+					dest[o + 0] = (pixel_v * fg.r) >> 8;
+					dest[o + 1] = (pixel_v * fg.g) >> 8;
+					dest[o + 2] = (pixel_v * fg.b) >> 8;
+				}
 			}
 		}
 	}
