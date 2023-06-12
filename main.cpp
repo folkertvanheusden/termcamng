@@ -140,7 +140,7 @@ typedef struct
 	std::map<std::string, client_t *> clients;
 } clients_t;
 
-void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, const bool dumb_telnet, clients_t *const clients)
+void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients)
 {
 	// setup ssh server
 	ssh_bind sshbind = ssh_bind_new();
@@ -264,7 +264,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 				ssh_message_free(message);
 			}
 
-			std::thread client_thread([session, username, channel, clients, t, program_fd, dumb_telnet] {
+			std::thread client_thread([session, username, channel, clients, t, program_fd, dumb_telnet, ignore_keypresses] {
 					set_thread_name("ssh-" + username);
 
 					std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
@@ -290,7 +290,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 
 						int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
 
-						if (i > 0) {
+						if (i > 0 && ignore_keypresses == false) {
 							if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
 								break;
 						}
@@ -339,7 +339,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 	printf("process_ssh: thread terminating\n");
 }
 
-void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, clients_t *const clients)
+void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients)
 {
 	int client_fd = -1;
 
@@ -456,7 +456,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 						telnet_recv = true;
 						telnet_left = 2;
 					}
-					else if (WRITE(program_fd, &c, 1) != 1) {
+					else if (ignore_keypresses == false && WRITE(program_fd, &c, 1) != 1) {
 						assert(telnet_recv == false);
 						assert(telnet_left == 0);
 
@@ -566,6 +566,8 @@ int main(int argc, char *argv[])
 
 	const bool dumb_telnet        = yaml_get_bool(config,   "dumb-telnet",  "dumb, slow refresh for telnet sessions; this may increase compatibility with differing resolutions");
 
+	const bool ignore_keypresses  = yaml_get_bool(config,   "ignore-keypresses", "should key-presses from telnet/ssh clients be ignored");
+
 	signal(SIGINT,  signal_handler);
 	signal(SIGPIPE, SIG_IGN);
 
@@ -596,18 +598,18 @@ int main(int argc, char *argv[])
 
 	std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
-	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, &clients] {
+	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients] {
 			set_thread_name("telnet");
 
 			if (telnet_port != 0)
-				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, &clients);
+				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients);
 				});
 
-	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, &clients] {
+	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, ignore_keypresses, &clients] {
 			set_thread_name("ssh");
 
 			if (ssh_port != 0)
-				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, &clients);
+				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, ignore_keypresses, &clients);
 				});
 
 	http_server_parameters_t server_parameters { 0 };

@@ -23,6 +23,10 @@ telnet-port: 2300
 # resolution of the telnet-session
 dumb-telnet: true
 
+# if termcamng should ignore key-presses from telnet/ssh
+# sessions
+ignore-input: false
+
 http-addr: 127.0.0.1
 http-port: 8080
 
