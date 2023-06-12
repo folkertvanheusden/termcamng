@@ -529,106 +529,111 @@ int main(int argc, char *argv[])
 	if (argc == 2)
 		cfg_file = argv[1];
 
-	YAML::Node config             = YAML::LoadFile(cfg_file);
+	try {
+		YAML::Node config             = YAML::LoadFile(cfg_file);
 
-	const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
+		const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
 
-	YAML::Node font_map           = yaml_get_yaml_node(config, "font-files", "TTF font file");
+		YAML::Node font_map           = yaml_get_yaml_node(config, "font-files", "TTF font file");
 
-	std::vector<std::string> font_files;
+		std::vector<std::string> font_files;
 
-	for(YAML::const_iterator it = font_map.begin(); it != font_map.end(); it++) {
-		const std::string file = it->as<std::string>();
+		for(YAML::const_iterator it = font_map.begin(); it != font_map.end(); it++) {
+			const std::string file = it->as<std::string>();
 
-		font_files.push_back(file);
-	}
+			font_files.push_back(file);
+		}
 
-	font f(font_files, font_height);
+		font f(font_files, font_height);
 
-	const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
-	const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");
-	const int compression_level   = yaml_get_int(config,    "compression-level", "value between 0 (no compression) and 100 (max.)");
+		const int width               = yaml_get_int(config,    "width",        "terminal console width (e.g. 80)");
+		const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");
+		const int compression_level   = yaml_get_int(config,    "compression-level", "value between 0 (no compression) and 100 (max.)");
 
-	const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
-	const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
+		const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
+		const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
 
-	const std::string http_bind   = yaml_get_string(config, "http-addr",    "network interface (IP address) to let the http port bind to");
-	const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
+		const std::string http_bind   = yaml_get_string(config, "http-addr",    "network interface (IP address) to let the http port bind to");
+		const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
 
-	const int minimum_fps         = yaml_get_int(config,    "minimum-fps",  "minimum number of frame per second; set to 0 to not control this");
+		const int minimum_fps         = yaml_get_int(config,    "minimum-fps",  "minimum number of frame per second; set to 0 to not control this");
 
-	const int ssh_port            = yaml_get_int(config,    "ssh-port",     "SSH port for controlling the program (0 to disable)");
-	const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",     "network interface (IP address) to let the SSH port bind to");
-	const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",     "directory where the SSH keys are stored");
+		const int ssh_port            = yaml_get_int(config,    "ssh-port",     "SSH port for controlling the program (0 to disable)");
+		const std::string ssh_bind    = yaml_get_string(config, "ssh-addr",     "network interface (IP address) to let the SSH port bind to");
+		const std::string ssh_keys    = yaml_get_string(config, "ssh-keys",     "directory where the SSH keys are stored");
 
-	const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
-	const bool do_fork            = yaml_get_bool(config,   "fork",         "fork into the background");
+		const bool local_output       = yaml_get_bool(config,   "local-output", "show program output locally as well");
+		const bool do_fork            = yaml_get_bool(config,   "fork",         "fork into the background");
 
-	const bool dumb_telnet        = yaml_get_bool(config,   "dumb-telnet",  "dumb, slow refresh for telnet sessions; this may increase compatibility with differing resolutions");
+		const bool dumb_telnet        = yaml_get_bool(config,   "dumb-telnet",  "dumb, slow refresh for telnet sessions; this may increase compatibility with differing resolutions");
 
-	const bool ignore_keypresses  = yaml_get_bool(config,   "ignore-keypresses", "should key-presses from telnet/ssh clients be ignored");
+		const bool ignore_keypresses  = yaml_get_bool(config,   "ignore-keypresses", "should key-presses from telnet/ssh clients be ignored");
 
-	signal(SIGINT,  signal_handler);
-	signal(SIGPIPE, SIG_IGN);
+		signal(SIGINT,  signal_handler);
+		signal(SIGPIPE, SIG_IGN);
 
-	terminal t(&f, width, height, &stop);
+		terminal t(&f, width, height, &stop);
 
-	std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
-	std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
+		std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
+		std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
 
-	// configure logfile
-	YAML::Node cfg_log     = yaml_get_yaml_node(config, "logging",    "configuration of logging output");
-	std::string logfile    = yaml_get_string(cfg_log, "file",         "file to log to");
+		// configure logfile
+		YAML::Node cfg_log     = yaml_get_yaml_node(config, "logging",    "configuration of logging output");
+		std::string logfile    = yaml_get_string(cfg_log, "file",         "file to log to");
 
-	log_level_t ll_file    = str_to_ll(yaml_get_string(cfg_log, "loglevel-files",  "log-level for log-file"));
-	log_level_t ll_screen  = str_to_ll(yaml_get_string(cfg_log, "loglevel-screen", "log-level for screen output"));
+		log_level_t ll_file    = str_to_ll(yaml_get_string(cfg_log, "loglevel-files",  "log-level for log-file"));
+		log_level_t ll_screen  = str_to_ll(yaml_get_string(cfg_log, "loglevel-screen", "log-level for screen output"));
 
-	setlog(logfile.c_str(), ll_file, ll_screen);
+		setlog(logfile.c_str(), ll_file, ll_screen);
 
-	if (do_fork) {
-		if (daemon(1, 1) == -1)
-			error_exit(true, "main: failed to fork into the background");
-	}
+		if (do_fork) {
+			if (daemon(1, 1) == -1)
+				error_exit(true, "main: failed to fork into the background");
+		}
 
-	// main functionality
-	clients_t clients;
+		// main functionality
+		clients_t clients;
 
-	auto proc             = exec_with_pipe(command, directory, width, height);
-	int  program_fd       = std::get<1>(proc);
+		auto proc             = exec_with_pipe(command, directory, width, height);
+		int  program_fd       = std::get<1>(proc);
 
-	std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
+		std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
-	std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients] {
-			set_thread_name("telnet");
+		std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients] {
+				set_thread_name("telnet");
 
-			if (telnet_port != 0)
+				if (telnet_port != 0)
 				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients);
 				});
 
-	std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, ignore_keypresses, &clients] {
-			set_thread_name("ssh");
+		std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, ignore_keypresses, &clients] {
+				set_thread_name("ssh");
 
-			if (ssh_port != 0)
+				if (ssh_port != 0)
 				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, ignore_keypresses, &clients);
 				});
 
-	http_server_parameters_t server_parameters { 0 };
-	server_parameters.t                 = &t;
-	server_parameters.compression_level = compression_level;
-	server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
+		http_server_parameters_t server_parameters { 0 };
+		server_parameters.t                 = &t;
+		server_parameters.compression_level = compression_level;
+		server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
-	httpd *h = start_http_server(http_bind, http_port, &server_parameters);
+		httpd *h = start_http_server(http_bind, http_port, &server_parameters);
 
-	while(!stop)
-		sleep(1);
+		while(!stop)
+			sleep(1);
 
-	ssh_thread_handle.join();
+		ssh_thread_handle.join();
 
-	telnet_thread_handle.join();
+		telnet_thread_handle.join();
 
-	read_program.join();
+		read_program.join();
 
-	stop_http_server(h);
+		stop_http_server(h);
+	}
+	catch(const std::string & exception) {
+		error_exit(true, "Program failure: %s", exception.c_str());
+	}
 
 	return 0;
 }
