@@ -209,6 +209,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 
 			x = y = 0;
 		}
+		else {
+			dolog(ll_info, "CSI %c %d not supported", cmd, val);
+		}
 
 		for(int pos=start_pos; pos<end_pos; pos++) {
 			screen[pos].c           = ' ';
@@ -232,6 +235,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			end_x   = x + 1;
 		else if (val == 2) {
 			// use defaults
+		}
+		else {
+			dolog(ll_info, "CSI %c %d not supported", cmd, val);
 		}
 
 		for(int cx=start_x; cx<end_x; cx++)
@@ -355,19 +361,25 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			escape_state = E_ESC, utf8_len = 0;
 		else if (in[i] == '[' && escape_state == E_ESC)
 			escape_state = E_BRACKET, utf8_len = 0;
-		else if (((in[i] >= '0' && in[i] <= '9') || in[i] == ';') && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
-			if (escape_state == E_BRACKET)
-				escape_state = E_VALUES;
+		else if (escape_state == E_BRACKET || escape_state == E_VALUES) {
+			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';') {
+				if (escape_state == E_BRACKET)
+					escape_state = E_VALUES;
 
-			escape_value += in[i];
+				escape_value += in[i];
+			}
+			else if (in[i] >= 0x40 && in[i] <= 0x7e) {
+				send_back = process_escape(in[i], escape_value);
 
-			utf8_len = 0;
-		}
-		else if ((in[i] >= 0x40 && in[i] <= 0x7e) && (escape_state == E_BRACKET || escape_state == E_VALUES)) {
-			send_back = process_escape(in[i], escape_value);
+				escape_state = E_NONE;
+				escape_value.clear();
+			}
+			else {
+				dolog(ll_info, "[%s%c not supported", escape_value.c_str(), in[i]);
 
-			escape_state = E_NONE;
-			escape_value.clear();
+				escape_state = E_NONE;
+				escape_value.clear();
+			}
 
 			utf8_len = 0;
 		}
