@@ -308,10 +308,14 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		}
 	}
 	else if (cmd == 'P') {  // delete character
-		delete_character(par1.has_value() ? par1.value() : 1);
+		int n = evaluate_n(par1);
+
+		delete_character(n);
 	}
 	else if (cmd == '@') {  // insert character
-		insert_character(par1.has_value() ? par1.value() : 1);
+		int n = evaluate_n(par1);
+
+		insert_character(n);
 	}
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
