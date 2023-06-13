@@ -129,14 +129,18 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	if (cmd == 'A') {  // cursor up
 		y -= evaluate_n(par1);
 
-		if (y < 0)
+		if (y < 0) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = 0;
+		}
 	}
 	else if (cmd == 'B') {  // cursor down
 		y += evaluate_n(par1);
 
-		if (y >= h)
+		if (y >= h) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = h - 1;
+		}
 	}
 	else if (cmd == 'b') { // repeat
 		int n = par1.has_value() ? par1.value() : 1;
@@ -149,53 +153,70 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	else if (cmd == 'C') {  // cursor forward
 		x += evaluate_n(par1);
 
-		if (x >= w)
+		if (x >= w) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
 			x = w - 1;
+		}
 	}
 	else if (cmd == 'D') {  // cursor backward
 		x -= evaluate_n(par1);
 
-		if (x < 0)
+		if (x < 0) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
 			x = 0;
+		}
 	}
 	else if (cmd == 'd') {  // set y(?)
 		y = par1.has_value() ? par1.value() - 1 : 0;
 
-		if (y < 0)
+		if (y < 0) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = 0;
-		else if (y >= h)
+		}
+		else if (y >= h) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = h - 1;
+		}
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
 		x = par1.has_value() ? par1.value() - 1 : 0;
 
-		if (x < 0)
+		if (x < 0) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
 			x = 0;
-		else if (x >= w)
+		}
+		else if (x >= w) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
 			x = w - 1;
+		}
 	}
 	else if (cmd == 'H' || cmd == 'f') {  // set position
 		y = par1.has_value() ? par1.value() - 1 : 0;
 
-		if (y < 0)
+		if (y < 0) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = 0;
-		else if (y >= h)
+		}
+		else if (y >= h) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
 			y = h - 1;
+		}
 
-		if (pars.size() >= 2) {
-			x = par2.has_value() ? par2.value() - 1 : 0;
+		if (par2.has_value()) {
+			x = par2.value() - 1;
 
-			if (x < 0)
+			if (x < 0) {
+				dolog(ll_info, "%c: x=%d", cmd, x);
 				x = 0;
-			else if (x >= w)
+			}
+			else if (x >= w) {
+				dolog(ll_info, "%c: x=%d", cmd, x);
 				x = w - 1;
+			}
 		}
 	}
 	else if (cmd == 'J') {
-		int val = 0;
-
-		if (pars.size() >= 1)
-			val = std::atoi(pars[0].c_str());
+		int val = par1.has_value() ? par1.value() : 0;
 
 		int start_pos = 0;
 		int end_pos   = y * w + x;
@@ -221,10 +242,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		}
 	}
 	else if (cmd == 'K') {
-		int val = 0;
-
-		if (pars.size() >= 1)
-			val = std::atoi(pars[0].c_str());
+		int val = par1.has_value() ? par1.value() : 0;
 
 		int start_x = 0;
 		int end_x   = w;
