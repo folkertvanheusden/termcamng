@@ -111,6 +111,23 @@ int evaluate_n(const std::optional<int> & in)
 	return 1;
 }
 
+void terminal::emit_character(const uint32_t c)
+{
+	screen[y * w + x].c           = c;
+	screen[y * w + x].fg_col_ansi = fg_col_ansi;
+	screen[y * w + x].bg_col_ansi = bg_col_ansi;
+	screen[y * w + x].attr        = attr;
+
+	x++;
+
+	if (x == w) {
+		x = 0;
+		y++;
+	}
+
+	last_character = c;
+}
+
 std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::optional<std::string> send_back;
@@ -143,12 +160,10 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		}
 	}
 	else if (cmd == 'b') { // repeat
-		int n = par1.has_value() ? par1.value() : 1;
-
-		char data[] = { last_character };  // TODO
+		int n = evaluate_n(par1);
 
 		for(int i=0; i<n; i++)
-			process_input(data, sizeof data);
+			emit_character(last_character);
 	}
 	else if (cmd == 'C') {  // cursor forward
 		x += evaluate_n(par1);
@@ -202,17 +217,15 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			y = h - 1;
 		}
 
-		if (par2.has_value()) {
-			x = par2.value() - 1;
+		x = par2.has_value() ? par2.value() - 1 : 0;
 
-			if (x < 0) {
-				dolog(ll_info, "%c: x=%d", cmd, x);
-				x = 0;
-			}
-			else if (x >= w) {
-				dolog(ll_info, "%c: x=%d", cmd, x);
-				x = w - 1;
-			}
+		if (x < 0) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
+			x = 0;
+		}
+		else if (x >= w) {
+			dolog(ll_info, "%c: x=%d", cmd, x);
+			x = w - 1;
 		}
 	}
 	else if (cmd == 'J') {
@@ -387,13 +400,16 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				escape_value += in[i];
 			}
 			else if (in[i] >= 0x40 && in[i] <= 0x7e) {
-				send_back = process_escape(in[i], escape_value);
+				// because of 'b'
+				std::string temp = escape_value;
 
 				escape_state = E_NONE;
 				escape_value.clear();
+
+				send_back = process_escape(in[i], temp);
 			}
 			else {
-				dolog(ll_info, "[%s%c not supported", escape_value.c_str(), in[i]);
+				dolog(ll_info, "escape [%s%c not supported", escape_value.c_str(), in[i]);
 
 				escape_state = E_NONE;
 				escape_value.clear();
@@ -430,21 +446,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				c = in[i];
 			}
 
-			if (c != uint32_t(-1)) {
-				screen[y * w + x].c           = c;
-				screen[y * w + x].fg_col_ansi = fg_col_ansi;
-				screen[y * w + x].bg_col_ansi = bg_col_ansi;
-				screen[y * w + x].attr        = attr;
-
-				x++;
-
-				if (x == w) {
-					x = 0;
-					y++;
-				}
-
-				last_character = c;
-			}
+			if (c != uint32_t(-1))
+				emit_character(c);
 		}
 
 		if (y == h) {
