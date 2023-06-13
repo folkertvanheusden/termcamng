@@ -75,7 +75,7 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 				uint8_t b = bitmap->buffer[io];
 
-				int screen_buffer_offset  = screen_y * dest_width * 3 + x * 3;
+				int screen_buffer_offset  = screen_y * dest_width * 3 + x * 3 + glyph_x * 8;
 
 				for(int xbit=0; xbit < 8; xbit++) {
 					int pixel_v = b & 128 ? 255 : 0;
@@ -87,9 +87,14 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 					int sub = 255 - pixel_v;
 
-					dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
-					dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
-					dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+					// if (screen_buffer_offset < 0 || screen_buffer_offset >= bytes)
+					//	printf("%d,%d | %d => %d\n", glyph_x, glyph_y, xbit, screen_buffer_offset);
+
+					if (screen_buffer_offset >= 0) {
+						dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+						dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+						dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+					}
 
 					screen_buffer_offset += 3;
 				}
@@ -181,8 +186,10 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 
 			// draw background
 			for(int cy=0; cy<output_height; cy++) {
+				int offset_y = (y + cy) * dest_width * 3;
+
 				for(int cx=0; cx<font_width; cx++) {
-					int offset = (y + cy) * dest_width * 3 + (x + cx) * 3;
+					int offset = offset_y + (x + cx) * 3;
 
 					dest[offset + 0] = bg.r;
 					dest[offset + 1] = bg.g;
@@ -191,6 +198,9 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			}
 
 			FT_GlyphSlot slot   = faces.at(face)->glyph;
+
+			if (!slot)
+				continue;
 
 			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
 
