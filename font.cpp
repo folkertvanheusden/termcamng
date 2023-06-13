@@ -60,22 +60,22 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 	const int bytes = dest_width * dest_height * 3;
 
 	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
-		for(unsigned int yo=0; yo<bitmap->rows; yo++) {
-			int yu = yo + y;
+		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+			int screen_y = glyph_y + y;
 
-			if (yu < 0)
+			if (screen_y < 0)
 				continue;
 
-			if (yu >= dest_height)
+			if (screen_y >= dest_height)
 				break;
 
 			// assuming width is always multiple of 8
-			for(unsigned xo=0; xo<bitmap->width / 8; xo++) {
-				int io = yo * bitmap->width / 8 + xo;
+			for(unsigned glyph_x=0; glyph_x<bitmap->width / 8; glyph_x++) {
+				int io = glyph_y * bitmap->width / 8 + glyph_x;
 
 				uint8_t b = bitmap->buffer[io];
 
-				int o  = yu * dest_width * 3 + x * 3;
+				int screen_buffer_offset  = screen_y * dest_width * 3 + x * 3;
 
 				for(int xbit=0; xbit < 8; xbit++) {
 					int pixel_v = b & 128 ? 255 : 0;
@@ -87,34 +87,34 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 					int sub = 255 - pixel_v;
 
-					dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
-					dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
-					dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+					dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+					dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+					dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
 
-					o += 3;
+					screen_buffer_offset += 3;
 				}
 			}
 		}
 	}
 	else if (bitmap->pixel_mode == FT_PIXEL_MODE_GRAY) {
-		for(unsigned int yo=0; yo<bitmap->rows; yo++) {
-			int yu = yo + y;
+		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+			int screen_y = glyph_y + y;
 
-			if (yu < 0)
+			if (screen_y < 0)
 				continue;
 
-			if (yu >= dest_height)
+			if (screen_y >= dest_height)
 				break;
 
-			for(unsigned xo=0; xo<bitmap->width; xo++) {
-				int xu = xo + x;
+			for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+				int screen_x = glyph_x + x;
 
-				if (xu >= dest_width)
+				if (screen_x >= dest_width)
 					break;
 
-				int o  = yu * dest_width * 3 + xu * 3;
+				int screen_buffer_offset  = screen_y * dest_width * 3 + screen_x * 3;
 
-				int io = yo * bitmap->width + xo;
+				int io = glyph_y * bitmap->width + glyph_x;
 
 				int pixel_v = bitmap->buffer[io];
 
@@ -123,30 +123,30 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 				int sub = 255 - pixel_v;
 
-				dest[o + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
-				dest[o + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
-				dest[o + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+				dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+				dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+				dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
 			}
 		}
 
 		if (underline) {
 			int pixel_v = invert ? 0 : 255;
 
-			for(int yo=0; yo<height; yo++) {
-				for(unsigned int xo=0; xo<bitmap->width; xo++) {
-					int xu = xo + x;
+			for(int glyph_y=0; glyph_y<height; glyph_y++) {
+				for(unsigned int glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+					int screen_x = glyph_x + x;
 
-					if (xu >= dest_width)
+					if (screen_x >= dest_width)
 						break;
 
-					int o = (y + height - (1 + yo)) * dest_width * 3 + xu * 3;
+					int screen_buffer_offset = (y + height - (1 + glyph_y)) * dest_width * 3 + screen_x * 3;
 
-					if (o + 2 >= bytes)
+					if (screen_buffer_offset + 2 >= bytes)
 						continue;
 
-					dest[o + 0] = (pixel_v * fg.r) >> 8;
-					dest[o + 1] = (pixel_v * fg.g) >> 8;
-					dest[o + 2] = (pixel_v * fg.b) >> 8;
+					dest[screen_buffer_offset + 0] = (pixel_v * fg.r) >> 8;
+					dest[screen_buffer_offset + 1] = (pixel_v * fg.g) >> 8;
+					dest[screen_buffer_offset + 2] = (pixel_v * fg.b) >> 8;
 				}
 			}
 		}
