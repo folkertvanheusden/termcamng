@@ -99,6 +99,18 @@ void terminal::delete_character(const int n)
 	}
 }
 
+int evaluate_n(const std::optional<int> & in)
+{
+	if (in.has_value()) {
+		if (in.value() == 0)
+			return 1;
+
+		return in.value();
+	}
+
+	return 1;
+}
+
 std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters)
 {
 	std::optional<std::string> send_back;
@@ -115,13 +127,13 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		par2 = std::atoi(pars[1].c_str());
 
 	if (cmd == 'A') {  // cursor up
-		y -= par1.has_value() ? par1.value() : 1;
+		y -= evaluate_n(par1);
 
 		if (y < 0)
 			y = 0;
 	}
 	else if (cmd == 'B') {  // cursor down
-		y += par1.has_value() ? par1.value() : 1;
+		y += evaluate_n(par1);
 
 		if (y >= h)
 			y = h - 1;
@@ -135,13 +147,13 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			process_input(data, sizeof data);
 	}
 	else if (cmd == 'C') {  // cursor forward
-		x += par1.has_value() ? par1.value() : 1;
+		x += evaluate_n(par1);
 
 		if (x >= w)
 			x = w - 1;
 	}
 	else if (cmd == 'D') {  // cursor backward
-		x -= par1.has_value() ? par1.value() : 1;
+		x -= evaluate_n(par1);
 
 		if (x < 0)
 			x = 0;
@@ -226,13 +238,17 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			erase_cell(cx, y);
 	}
 	else if (cmd == 'L') {
-		for(int i=0; i<(par1.has_value() ? par1.value() : 1); i++)
+		int n = evaluate_n(par1);
+
+		for(int i=0; i<n; i++)
 			insert_line(y);
 
 		x = 0;
 	}
 	else if (cmd == 'M') {
-		for(int i=0; i<(par1.has_value() ? par1.value() : 1); i++)
+		int n = evaluate_n(par1);
+
+		for(int i=0; i<n; i++)
 			delete_line(y);
 
 		x = 0;
