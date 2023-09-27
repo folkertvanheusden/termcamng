@@ -115,7 +115,9 @@ void terminal::emit_character(const uint32_t c)
 {
 	screen[y * w + x].c           = c;
 	screen[y * w + x].fg_col_ansi = fg_col_ansi;
+	screen[y * w + x].fg_rgb      = fg_rgb;
 	screen[y * w + x].bg_col_ansi = bg_col_ansi;
+	screen[y * w + x].bg_rgb      = bg_rgb;
 	screen[y * w + x].attr        = attr;
 
 	x++;
@@ -250,7 +252,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		for(int pos=start_pos; pos<end_pos; pos++) {
 			screen[pos].c           = ' ';
 			screen[pos].fg_col_ansi = fg_col_ansi;
+			screen[pos].fg_rgb      = fg_rgb;
 			screen[pos].bg_col_ansi = bg_col_ansi;
+			screen[pos].bg_rgb      = bg_rgb;
 			screen[pos].attr        = attr;
 		}
 	}
@@ -294,13 +298,25 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		if (pars.empty())
 			fg_col_ansi = 7, bg_col_ansi = 0, attr = 0;
 		else {
-			for(auto & par : pars) {
-				int par_val = std::atoi(par.c_str());
+			int rgb_fg_index = -1;
+			bool is_fg = true;
+			int rgb_bg_index = -1;
+
+			for(size_t i=0; i<pars.size(); i++) {
+				int par_val = std::atoi(pars.at(i).c_str());
 
 				if (par_val >= 30 && par_val <= 37)  // fg color
 					fg_col_ansi = par_val - 30;
+				else if (par_val == 38) {
+					fg_col_ansi = -1;  // rgb
+					is_fg = true;
+				}
 				else if (par_val == 39)
 					fg_col_ansi = 7;
+				else if (par_val == 48) {
+					bg_col_ansi = -1;  // rgb
+					is_fg = false;
+				}
 				else if (par_val == 49)
 					bg_col_ansi = 0;
 				else if (par_val >= 40 && par_val <= 47)  // bg color
@@ -309,8 +325,16 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					fg_col_ansi = bg_col_ansi = attr = 0;
 				else if (par_val == 1)  // bold
 					attr |= A_BOLD;
-				else if (par_val == 2)  // faint
+				else if (par_val == 2) {  // faint or rgb selection
+					if (fg_col_ansi == -1 && is_fg == true)
+						rgb_fg_index = i + 1, i += 3;
+					else if (bg_col_ansi == -1 && is_fg == false)
+						rgb_bg_index = i + 1, i += 3;
+					else
+						dolog(ll_info, "rgb selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
+
 					attr = attr & ~A_BOLD;
+				}
 				else if (par_val == 7)  // inverse video
 					attr ^= A_INVERSE;
 				else if (par_val >= 10 && par_val <= 19) {
@@ -319,6 +343,18 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 				else {
 					dolog(ll_info, "code %d for 'm' not supported", par_val);
 				}
+			}
+
+			if (rgb_fg_index != -1 && pars.size() - rgb_fg_index >= 3) {
+				fg_rgb.r = std::atoi(pars.at(rgb_fg_index + 0).c_str());
+				fg_rgb.g = std::atoi(pars.at(rgb_fg_index + 1).c_str());
+				fg_rgb.b = std::atoi(pars.at(rgb_fg_index + 2).c_str());
+			}
+
+			if (rgb_bg_index != -1 && pars.size() - rgb_bg_index >= 3) {
+				bg_rgb.r = std::atoi(pars.at(rgb_bg_index + 0).c_str());
+				bg_rgb.g = std::atoi(pars.at(rgb_bg_index + 1).c_str());
+				bg_rgb.b = std::atoi(pars.at(rgb_bg_index + 2).c_str());
 			}
 		}
 	}
@@ -340,7 +376,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		for(int i=0; i<par1; i++) {
 			screen[offset + i].c           = ' ';
 			screen[offset + i].fg_col_ansi = fg_col_ansi;
+			screen[offset + i].fg_rgb      = fg_rgb;
 			screen[offset + i].bg_col_ansi = bg_col_ansi;
+			screen[offset + i].bg_rgb      = bg_rgb;
 			screen[offset + i].attr        = attr;
 		}
 	}
@@ -512,11 +550,20 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			int      fg_color     = screen[offset].fg_col_ansi;
 			int      bg_color     = screen[offset].bg_col_ansi;
 
-			if (fg_color == bg_color)
+			if (fg_color == bg_color && fg_color != -1)
 				fg_color = 7, bg_color = 0;
 
-			rgb_t    fg           = color_map[bold][fg_color];
-			rgb_t    bg           = color_map[0][bg_color];
+			rgb_t    fg;
+			if (fg_color == -1)
+				fg   = screen[offset].fg_rgb;
+			else
+				fg   = color_map[bold][fg_color];
+
+			rgb_t    bg;
+			if (bg_color == -1)
+				bg   = screen[offset].bg_rgb;
+			else
+				bg   = color_map[0][bg_color];
 
 			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
 			bool     underline    = false;

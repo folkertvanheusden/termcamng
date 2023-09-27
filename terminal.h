@@ -19,7 +19,9 @@ typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
 typedef struct {
 	uint32_t c;
 	int      fg_col_ansi;
+	rgb_t    fg_rgb;
 	int      bg_col_ansi;
+	rgb_t    bg_rgb;
 	int      attr;
 } pos_t;
 
@@ -34,7 +36,9 @@ private:
 	escape_state_t    escape_state { E_NONE };
 	std::string       escape_value;
 	int               fg_col_ansi { 37 };
+	rgb_t             fg_rgb      { 255, 255, 255 };
 	int               bg_col_ansi { 40 };
+	rgb_t             bg_rgb      { 0, 0, 0 };
 	int               attr        {  0 };
 	rgb_t             color_map[2][8];
 	uint32_t          last_character { ' ' };
