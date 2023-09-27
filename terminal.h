@@ -41,6 +41,7 @@ private:
 	rgb_t             bg_rgb      { 0, 0, 0 };
 	int               attr        {  0 };
 	rgb_t             color_map[2][8];
+	rgb_t             color_map_256c[256];
 	uint32_t          last_character { ' ' };
 	uint64_t          latest_update { 0 };
 	int               utf8_len  { 0 };
