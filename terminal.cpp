@@ -330,10 +330,10 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 						rgb_fg_index = i + 1, i += 3;
 					else if (bg_col_ansi == -1 && is_fg == false)
 						rgb_bg_index = i + 1, i += 3;
+					else if (fg_col_ansi != -1 && bg_col_ansi != -1)
+						attr = attr & ~A_BOLD;
 					else
 						dolog(ll_info, "rgb selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
-
-					attr = attr & ~A_BOLD;
 				}
 				else if (par_val == 7)  // inverse video
 					attr ^= A_INVERSE;
