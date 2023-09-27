@@ -16,6 +16,9 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 {
 	screen = new pos_t[w * h]();
 
+	for(int i=0; i<w * h; i++)
+		screen[i].c = ' ';
+
 	color_map[0][0] = {   0,   0,   0 };  // black
 	color_map[0][1] = { 170,   0,   0 };  // red
 	color_map[0][2] = {   0, 170,   0 };  // green
