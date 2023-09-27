@@ -17,6 +17,8 @@ required
  * libpng-dev
  * libssh-dev
  * libyaml-cpp-dev
+ * libturbojpeg0-dev
+ * libfreetype-dev
 
 In the example yaml-file (configuration-file) the fonts from the
 debian fonts-unifont and fonts-wine packages are used.
@@ -53,7 +55,7 @@ http
 demo
 ----
 
-http://vps001.vanheusden.com:8888/stream
+http://vps001.vanheusden.com:8888/stream.mjpeg
 
 Note: it works fine with the chrome browser on Linux. Current (Feb.
 2022) Firefox browsers sometimes show only a partial part of the
