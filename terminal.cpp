@@ -368,6 +368,12 @@ int evaluate_n(const std::optional<int> & in)
 
 void terminal::emit_character(const uint32_t c)
 {
+	if (x == w) {
+		x = 0;
+
+		y++;
+	}
+
 	screen[y * w + x].c           = c;
 	screen[y * w + x].fg_col_ansi = fg_col_ansi;
 	screen[y * w + x].fg_rgb      = fg_rgb;
@@ -376,11 +382,6 @@ void terminal::emit_character(const uint32_t c)
 	screen[y * w + x].attr        = attr;
 
 	x++;
-
-	if (x == w) {
-		x = 0;
-		y++;
-	}
 
 	last_character = c;
 }
@@ -609,7 +610,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 				else if (par_val == 27)  // inverse video off
 					attr &= ~A_INVERSE;
 				else if (par_val == 9)  // strikethrough on
-					attr ^= A_STRIKETHROUGH;
+					attr |= A_STRIKETHROUGH;
 				else if (par_val == 29)  // strikethrough off
 					attr &= ~A_STRIKETHROUGH;
 				else if (par_val >= 10 && par_val <= 19) {
