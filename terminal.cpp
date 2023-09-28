@@ -606,6 +606,8 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					fg_col_ansi = bg_col_ansi = attr = 0;
 				else if (par_val == 1)  // bold
 					attr |= A_BOLD;
+				else if (par_val == 22)  // bold off
+					attr &= ~A_BOLD;
 				else if (par_val == 2) {  // faint or rgb selection
 					if (fg_col_ansi == -1 && is_fg == true)
 						rgb_fg_index = i + 1, i += 3, fg_is_rgb = true;
