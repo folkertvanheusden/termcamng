@@ -120,13 +120,15 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 			if (screen_y >= dest_height)
 				break;
 
+			const int screen_buffer_offset = screen_y * dest_width * 3;
+
 			for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
 				int screen_x = glyph_x + x;
 
 				if (screen_x >= dest_width)
 					break;
 
-				int screen_buffer_offset  = screen_y * dest_width * 3 + screen_x * 3;
+				int local_screen_buffer_offset = screen_buffer_offset + screen_x * 3;
 
 				int io = glyph_y * bitmap->width + glyph_x;
 
@@ -137,16 +139,18 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 				int sub = max - pixel_v;
 
-				dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
-				dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
-				dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
+				dest[local_screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
+				dest[local_screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
+				dest[local_screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
 			}
 		}
 	}
 
 	if (strikethrough) {
+		int offset = middle_line * dest_width * 3 + x * 3;
+
 		for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
-			int screen_buffer_offset  = middle_line * dest_width * 3 + x * 3 + glyph_x * 3;
+			int screen_buffer_offset = offset + glyph_x * 3;
 
 			if (screen_buffer_offset >= 0) {
 				dest[screen_buffer_offset + 0] = (max * fg.r) >> 8;
