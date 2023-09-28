@@ -754,7 +754,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		else if (in[i] == 27 && escape_state == E_NONE)
 			escape_state = E_ESC, utf8_len = 0;
 		else if (OSC) {
-			if (escape_state == E_ESC && in[i] == '\\') {
+			// < 32: any other C1 character can terminate a sequence (https://vt100.net/docs/vt510-rm/chapter4.html)
+			if ((escape_state == E_ESC && in[i] == '\\') || in[i] < 32){
 				OSC = false;
 				escape_state = E_NONE;
 			}
