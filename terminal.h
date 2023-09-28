@@ -16,6 +16,7 @@
 #define A_INVERSE       (1 << 2)
 #define A_UNDERLINE     (1 << 3)
 #define A_STRIKETHROUGH (1 << 4)
+#define A_BLINK         (1 << 5)
 
 typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
 
@@ -50,6 +51,8 @@ private:
 	int               utf8_len    { 0 };
 	uint32_t          utf8_code   { 0 };
 	bool              OSC         { false };
+	bool              blink_state { false };
+	uint64_t          blink_switch_ts { 0 };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
@@ -83,5 +86,5 @@ public:
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
 
-	void render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const;
+	void render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h);
 };

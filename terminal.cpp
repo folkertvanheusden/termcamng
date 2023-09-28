@@ -620,14 +620,18 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					attr |= A_UNDERLINE;
 				else if (par_val == 24)  // underline off
 					attr &= ~A_UNDERLINE;
-				else if (par_val == 5) {  // 256 color mode
+				else if (par_val == 5) {  // 256 color mode / blink on
 					if (fg_col_ansi == -1 && is_fg == true)
 						rgb_fg_index = i + 1, i += 1, fg_is_rgb = false;
 					else if (bg_col_ansi == -1 && is_fg == false)
 						rgb_bg_index = i + 1, i += 1, bg_is_rgb = false;
 					else
-						dolog(ll_info, "256 color selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
+						attr |= A_BLINK;
 				}
+				else if (par_val == 6)  // (rapid) blink on
+					attr |= A_BLINK;
+				else if (par_val == 25)  // blink off
+					attr &= ~A_BLINK;
 				else if (par_val == 7)  // inverse video on
 					attr ^= A_INVERSE;
 				else if (par_val == 27)  // inverse video off
@@ -836,7 +840,7 @@ std::optional<std::string> terminal::process_input(const std::string & in)
 	return process_input(in.c_str(), in.size());
 }
 
-void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h) const
+void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h)
 {
 	uint64_t start_wait = get_ms();
 
@@ -856,6 +860,11 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 	}
 
 	*ts_after = latest_update;
+
+	if (start_wait - blink_switch_ts >= 60000 / 150) {
+		blink_state     = !blink_state;
+		blink_switch_ts = latest_update;
+	}
 
 	const int char_w    = f->get_width();
 	const int char_h    = f->get_height();
@@ -901,6 +910,11 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 				bg   = color_map[0][bg_color];
 
 			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
+
+			bool     blink        = !!(screen[offset].attr & A_BLINK);
+
+			if (blink)
+				inverse = blink_state;
 
 			bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
 
