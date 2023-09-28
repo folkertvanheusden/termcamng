@@ -670,6 +670,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			dolog(ll_info, "code %d for 'n' not supported", par1);
 		}
 	}
+	else if (cmd == 'c') {  // "what are you"
+		send_back = "\033[?1;0c";
+	}
 	else if (cmd == 'X') {  // erase character
 		int offset = y * w + x;
 
@@ -697,6 +700,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	}
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
+		send_back = myformat("%c", cmd);
 	}
 
 	return send_back;
