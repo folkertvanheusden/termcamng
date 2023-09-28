@@ -451,6 +451,16 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			y = h - 1;
 		}
 	}
+	else if (cmd == 'E') {  // Move cursor to the beginning of the line n lines down
+		y += evaluate_n(par1);
+
+		if (y >= h) {
+			dolog(ll_info, "%c: y=%d", cmd, y);
+			y = h - 1;
+		}
+
+		x = 0;
+	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
 		x = par1.has_value() ? par1.value() - 1 : 0;
 
@@ -700,6 +710,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	}
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
+
 		send_back = myformat("%c", cmd);
 	}
 
@@ -738,7 +749,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		else if (in[i] == '[' && escape_state == E_ESC)
 			escape_state = E_BRACKET, utf8_len = 0;
 		else if (escape_state == E_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {
-			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';') {
+			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';' || in[i] == '?') {
 				if (escape_state == E_BRACKET)
 					escape_state = E_VALUES;
 
