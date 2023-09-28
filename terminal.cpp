@@ -423,7 +423,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		for(int i=0; i<n; i++)
 			emit_character(last_character);
 	}
-	else if (cmd == 'C') {  // cursor forward
+	else if (cmd == 'C') {  // cursor forward  CUF
 		x += evaluate_n(par1);
 
 		if (x >= w) {
@@ -431,7 +431,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			x = w - 1;
 		}
 	}
-	else if (cmd == 'D') {  // cursor backward
+	else if (cmd == 'D') {  // cursor backward  CUB
 		x -= evaluate_n(par1);
 
 		if (x < 0) {
@@ -463,7 +463,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			x = w - 1;
 		}
 	}
-	else if (cmd == 'H' || cmd == 'f') {  // set position
+	else if (cmd == 'H' || cmd == 'f') {  // set position  CUP
 		y = par1.has_value() ? par1.value() - 1 : 0;
 
 		if (y < 0) {
