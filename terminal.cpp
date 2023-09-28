@@ -368,7 +368,7 @@ int evaluate_n(const std::optional<int> & in)
 
 void terminal::emit_character(const uint32_t c)
 {
-	if (x == w) {
+	if (x >= w) {
 		x = 0;
 
 		y++;
