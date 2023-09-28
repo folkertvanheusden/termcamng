@@ -744,10 +744,10 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				// because of 'b'
 				std::string temp = escape_value;
 
+				send_back = process_escape(in[i], temp, escape_state == E_ESC);
+
 				escape_state = E_NONE;
 				escape_value.clear();
-
-				send_back = process_escape(in[i], temp, escape_state == E_ESC);
 			}
 			else {
 				dolog(ll_info, "escape [%s%c not supported", escape_value.c_str(), in[i]);
