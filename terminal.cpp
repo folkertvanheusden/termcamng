@@ -386,7 +386,7 @@ void terminal::emit_character(const uint32_t c)
 	last_character = c;
 }
 
-std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters)
+std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters, const bool is_short)
 {
 	std::optional<std::string> send_back;
 
@@ -545,10 +545,23 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	else if (cmd == 'M') {
 		int n = evaluate_n(par1);
 
-		for(int i=0; i<n; i++)
-			delete_line(y);
+		if (is_short) {
+			for(int i=0; i<n; i++) {
+				y--;
 
-		x = 0;
+				if (y < 0) {
+					y = 0;
+
+					insert_line(0);
+				}
+			}
+		}
+		else {
+			for(int i=0; i<n; i++)
+				delete_line(y);
+
+			x = 0;
+		}
 	}
 	else if (cmd == 'm') {
 		if (pars.empty())
@@ -720,7 +733,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			escape_state = E_ESC, utf8_len = 0;
 		else if (in[i] == '[' && escape_state == E_ESC)
 			escape_state = E_BRACKET, utf8_len = 0;
-		else if (escape_state == E_BRACKET || escape_state == E_VALUES) {
+		else if (escape_state == E_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {
 			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';') {
 				if (escape_state == E_BRACKET)
 					escape_state = E_VALUES;
@@ -734,7 +747,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				escape_state = E_NONE;
 				escape_value.clear();
 
-				send_back = process_escape(in[i], temp);
+				send_back = process_escape(in[i], temp, escape_state == E_ESC);
 			}
 			else {
 				dolog(ll_info, "escape [%s%c not supported", escape_value.c_str(), in[i]);

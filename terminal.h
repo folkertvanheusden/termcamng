@@ -77,7 +77,7 @@ public:
 
 	void emit_character(const uint32_t c);
 
-	std::optional<std::string> process_escape(const char cmd, const std::string & parameters);
+	std::optional<std::string> process_escape(const char cmd, const std::string & parameters, const bool is_short);
 
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
