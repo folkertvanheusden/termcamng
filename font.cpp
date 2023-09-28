@@ -66,8 +66,6 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 	else  // bold
 		max = 255;
 
-	const int middle_line = bitmap->rows / 2;
-
 	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
 		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
 			int screen_y = glyph_y + y;
@@ -147,6 +145,8 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 	}
 
 	if (strikethrough) {
+		const int middle_line = y + bitmap->rows / 2;
+
 		int offset = middle_line * dest_width * 3 + x * 3;
 
 		for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
