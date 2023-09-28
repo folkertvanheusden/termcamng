@@ -615,6 +615,14 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 				else if (par_val >= 10 && par_val <= 19) {
 					// font selection
 				}
+				else if (par_val >= 90 && par_val <= 97) {  // fg color bright
+					fg_col_ansi = par_val - 90;
+					attr |= A_BOLD;
+				}
+				else if (par_val >= 100 && par_val <= 107) {  // bg color bright
+					bg_col_ansi = par_val - 100;
+					attr |= A_BOLD;
+				}
 				else {
 					dolog(ll_info, "code %d for 'm' not supported", par_val);
 				}
