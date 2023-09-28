@@ -612,7 +612,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					else if (bg_col_ansi == -1 && is_fg == false)
 						rgb_bg_index = i + 1, i += 3, bg_is_rgb = true;
 					else if (fg_col_ansi != -1 && bg_col_ansi != -1)
-						attr = attr & ~A_BOLD;
+						attr |= A_DIM;
 					else
 						dolog(ll_info, "rgb selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
 				}
