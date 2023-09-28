@@ -55,9 +55,18 @@ font::~font()
 	FT_Done_FreeType(font::library);
 }
 
-void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const bool invert, const bool underline, uint8_t *const dest, const int dest_width, const int dest_height)
+void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	const int bytes = dest_width * dest_height * 3;
+
+	uint8_t max = 200;
+
+	if (intensity == intensity_t::I_DIM)
+		max = 100;
+	else  // bold
+		max = 255;
+
+	const int middle_line = bitmap->rows / 2;
 
 	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
 		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
@@ -78,14 +87,14 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 				int screen_buffer_offset  = screen_y * dest_width * 3 + x * 3 + glyph_x * 8;
 
 				for(int xbit=0; xbit < 8; xbit++) {
-					int pixel_v = b & 128 ? 255 : 0;
+					int pixel_v = b & 128 ? max : 0;
 
 					b <<= 1;
 
 					if (invert)
-						pixel_v = 255 - pixel_v;
+						pixel_v = max - pixel_v;
 
-					int sub = 255 - pixel_v;
+					int sub = max - pixel_v;
 
 					// if (screen_buffer_offset < 0 || screen_buffer_offset >= bytes)
 					//	printf("%d,%d | %d => %d\n", glyph_x, glyph_y, xbit, screen_buffer_offset);
@@ -121,38 +130,50 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 
 				int io = glyph_y * bitmap->width + glyph_x;
 
-				int pixel_v = bitmap->buffer[io];
+				int pixel_v = bitmap->buffer[io] * max / 255;
 
 				if (invert)
-					pixel_v = 255 - pixel_v;
+					pixel_v = max - pixel_v;
 
-				int sub = 255 - pixel_v;
+				int sub = max - pixel_v;
 
 				dest[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
 				dest[screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
 				dest[screen_buffer_offset + 2] = (pixel_v * fg.b + sub * bg.b) >> 8;
 			}
 		}
+	}
 
-		if (underline) {
-			int pixel_v = invert ? 0 : 255;
+	if (strikethrough) {
+		for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+			int screen_buffer_offset  = middle_line * dest_width * 3 + x * 3 + glyph_x * 3;
 
-			for(int glyph_y=0; glyph_y<height; glyph_y++) {
-				for(unsigned int glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
-					int screen_x = glyph_x + x;
+			if (screen_buffer_offset >= 0) {
+				dest[screen_buffer_offset + 0] = (max * fg.r) >> 8;
+				dest[screen_buffer_offset + 1] = (max * fg.g) >> 8;
+				dest[screen_buffer_offset + 2] = (max * fg.b) >> 8;
+			}
+		}
+	}
 
-					if (screen_x >= dest_width)
-						break;
+	if (underline) {
+		int pixel_v = invert ? 0 : max;
 
-					int screen_buffer_offset = (y + height - (1 + glyph_y)) * dest_width * 3 + screen_x * 3;
+		for(int glyph_y=0; glyph_y<height; glyph_y++) {
+			for(unsigned int glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+				int screen_x = glyph_x + x;
 
-					if (screen_buffer_offset + 2 >= bytes)
-						continue;
+				if (screen_x >= dest_width)
+					break;
 
-					dest[screen_buffer_offset + 0] = (pixel_v * fg.r) >> 8;
-					dest[screen_buffer_offset + 1] = (pixel_v * fg.g) >> 8;
-					dest[screen_buffer_offset + 2] = (pixel_v * fg.b) >> 8;
-				}
+				int screen_buffer_offset = (y + height - (1 + glyph_y)) * dest_width * 3 + screen_x * 3;
+
+				if (screen_buffer_offset + 2 >= bytes)
+					continue;
+
+				dest[screen_buffer_offset + 0] = (pixel_v * fg.r) >> 8;
+				dest[screen_buffer_offset + 1] = (pixel_v * fg.g) >> 8;
+				dest[screen_buffer_offset + 2] = (pixel_v * fg.b) >> 8;
 			}
 		}
 	}
@@ -168,7 +189,7 @@ int font::get_height() const
 	return font_height;
 }
 
-bool font::draw_glyph(const UChar32 utf_character, const int output_height, const bool invert, const bool underline, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
+bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	std::vector<FT_Encoding> encodings { ft_encoding_symbol, ft_encoding_unicode };
 
@@ -206,7 +227,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 
 			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
 
-			draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, invert, underline, dest, dest_width, dest_height);
+			draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
 
 			return true;
 		}

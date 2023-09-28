@@ -11,8 +11,11 @@
 #include "font.h"
 
 
-#define A_BOLD    (1 << 0)
-#define A_INVERSE (1 << 1)
+#define A_BOLD          (1 << 0)
+#define A_DIM           (1 << 1)
+#define A_INVERSE       (1 << 2)
+#define A_UNDERLINE     (1 << 3)
+#define A_STRIKETHROUGH (1 << 4)
 
 typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
 

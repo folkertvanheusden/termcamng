@@ -592,6 +592,10 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					else
 						dolog(ll_info, "rgb selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
 				}
+				else if (par_val == 4)  // underline on
+					attr |= A_UNDERLINE;
+				else if (par_val == 24)  // underline off
+					attr &= ~A_UNDERLINE;
 				else if (par_val == 5) {  // 256 color mode
 					if (fg_col_ansi == -1 && is_fg == true)
 						rgb_fg_index = i + 1, i += 1, fg_is_rgb = false;
@@ -600,8 +604,14 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					else
 						dolog(ll_info, "256 color selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
 				}
-				else if (par_val == 7)  // inverse video
+				else if (par_val == 7)  // inverse video on
 					attr ^= A_INVERSE;
+				else if (par_val == 27)  // inverse video off
+					attr &= ~A_INVERSE;
+				else if (par_val == 9)  // strikethrough on
+					attr ^= A_STRIKETHROUGH;
+				else if (par_val == 29)  // strikethrough off
+					attr &= ~A_STRIKETHROUGH;
 				else if (par_val >= 10 && par_val <= 19) {
 					// font selection
 				}
@@ -816,7 +826,15 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			int      offset       = cy * w + cx;
 			uint32_t c            = screen[offset].c;
 
-			int      bold         = screen[offset].attr & A_BOLD ? 1 : 0;
+			int      bold         = !!(screen[offset].attr & A_BOLD);
+			int      dim          = !!(screen[offset].attr & A_DIM);
+
+			font::intensity_t intensity = font::intensity_t::I_NORMAL;
+
+			if (bold && !dim)
+				intensity = font::intensity_t::I_BOLD;
+			else if (dim)
+				intensity = font::intensity_t::I_DIM;
 
 			int      fg_color     = screen[offset].fg_col_ansi;
 			int      bg_color     = screen[offset].bg_col_ansi;
@@ -837,12 +855,15 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 				bg   = color_map[0][bg_color];
 
 			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
-			bool     underline    = false;
+
+			bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
+
+			bool     underline    = !!(screen[offset].attr & A_UNDERLINE);
 
 			int     x            = cx * char_w;
 			int     y            = cy * char_h;
 
-			if (!f->draw_glyph(c, char_h, inverse, underline, fg, bg, x, y, *out, *out_w, *out_h)) {
+			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, fg, bg, x, y, *out, *out_w, *out_h)) {
 				// TODO
 			}
 		}
