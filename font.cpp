@@ -62,7 +62,7 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 	uint8_t max = 200;
 
 	if (intensity == intensity_t::I_DIM)
-		max = 100;
+		max = 145;
 	else  // bold
 		max = 255;
 
