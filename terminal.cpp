@@ -708,6 +708,9 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 
 		insert_character(n);
 	}
+	else if (cmd == ']') {  // "operating system command", terminated with ST (ESC \)
+		OSC = true;
+	}
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
 
@@ -746,6 +749,12 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		// ANSI escape handling
 		else if (in[i] == 27 && escape_state == E_NONE)
 			escape_state = E_ESC, utf8_len = 0;
+		else if (OSC) {
+			if (escape_state == E_ESC && in[i] == '\\') {
+				OSC = false;
+				escape_state = E_NONE;
+			}
+		}
 		else if (in[i] == '[' && escape_state == E_ESC)
 			escape_state = E_BRACKET, utf8_len = 0;
 		else if (escape_state == E_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {

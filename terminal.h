@@ -47,8 +47,9 @@ private:
 	rgb_t             color_map_256c[256];
 	uint32_t          last_character { ' ' };
 	uint64_t          latest_update { 0 };
-	int               utf8_len  { 0 };
-	uint32_t          utf8_code { 0 };
+	int               utf8_len    { 0 };
+	uint32_t          utf8_code   { 0 };
+	bool              OSC         { false };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
