@@ -15,7 +15,7 @@
 #include "str.h"
 
 
-httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, const int fd, const void *)> > & url_map, const void *const parameters) :
+httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, const int fd, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters) :
 	url_map(url_map),
 	parameters(parameters)
 {
@@ -82,7 +82,7 @@ void httpd::handle_request(const int fd)
 		return;
 	}
 
-	it->second(request.at(1), fd, parameters);
+	it->second(request.at(1), fd, parameters, stop_flag);
 }
 
 void httpd::operator()()

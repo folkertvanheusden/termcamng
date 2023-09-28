@@ -49,7 +49,7 @@ std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts
 	return { reinterpret_cast<uint8_t *>(data_out), data_out_len };
 }
 
-void get_html_root(const std::string url, const int fd, const void *const parameters)
+void get_html_root(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	std::string reply = 
 			"HTTP/1.0 200 OK\r\n"
@@ -65,7 +65,7 @@ void get_html_root(const std::string url, const int fd, const void *const parame
 	WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-void get_frame_jpeg(const std::string url, const int fd, const void *const parameters)
+void get_frame_jpeg(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -83,7 +83,7 @@ void get_frame_jpeg(const std::string url, const int fd, const void *const param
 	free(jpeg.first);
 }
 
-void get_frame_png(const std::string url, const int fd, const void *const parameters)
+void get_frame_png(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -101,7 +101,7 @@ void get_frame_png(const std::string url, const int fd, const void *const parame
 	free(png.first);
 }
 
-void stream_frames(const int fd, const http_server_parameters_t *const parameters, const stream_content_type_t type)
+void stream_frames(const int fd, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
 {
 	std::string reply =
 		"HTTP/1.0 200 OK\r\n"
@@ -118,7 +118,7 @@ void stream_frames(const int fd, const http_server_parameters_t *const parameter
 
 	uint64_t ts = 0;
 
-	for(;;) {
+	for(;!stop_flag;) {
 		auto image = type == sct_mpng ? get_png_frame(parameters->t, &ts, parameters->max_wait, parameters->compression_level) : get_jpeg_frame(parameters->t, &ts, parameters->max_wait, parameters->compression_level);
 
 		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", type == sct_mpng ? "png" : "jpeg", image.second);
@@ -139,7 +139,7 @@ void stream_frames(const int fd, const http_server_parameters_t *const parameter
 	}
 }
 
-void get_stream(const std::string url, const int fd, const void *const parameters)
+void get_stream(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -158,12 +158,12 @@ void get_stream(const std::string url, const int fd, const void *const parameter
 		sct = sct_mpng;
 
 	if (sct != sct_none)
-		stream_frames(fd, hsp, sct);
+		stream_frames(fd, hsp, sct, stop_flag);
 }
 
 httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp)
 {
-	std::map<std::string, std::function<void (const std::string url, const int fd, const void *)> > url_map;
+	std::map<std::string, std::function<void (const std::string url, const int fd, const void *, std::atomic_bool & stop_flag)> > url_map;
 
 	url_map.insert({ "/",             get_html_root });
 	url_map.insert({ "/index.html",   get_html_root });
