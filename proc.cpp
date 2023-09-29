@@ -8,13 +8,14 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include "error.h"
 #include "str.h"
 
 
 // this code needs more error checking TODO
-std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height)
+std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height, const int restart_interval)
 {
 	int fd_master { -1 };
 
@@ -27,45 +28,57 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 		error_exit(true, "exec_with_pipe: forkpty failed");
 
         if (pid == 0) {
-                setsid();
+		for(;restart_interval >= 0;) {
+			pid_t child_pid = fork();
 
-		std::string columns = myformat("%d", width);
-		std::string lines   = myformat("%d", height);
+			if (child_pid == 0) {
+				setsid();
 
-		if (setenv("COLUMNS", columns.c_str(), 1) == -1)
-			error_exit(true, "exec_with_pipe: setenv(COLUMNS) failed");
+				std::string columns = myformat("%d", width);
+				std::string lines   = myformat("%d", height);
 
-		if (setenv("LINES", lines.c_str(), 1) == -1)
-			error_exit(true, "exec_with_pipe: setenv(LINES) failed");
+				if (setenv("COLUMNS", columns.c_str(), 1) == -1)
+					error_exit(true, "exec_with_pipe: setenv(COLUMNS) failed");
 
-		if (setenv("TERM", "ansi", 1) == -1)
-			error_exit(true, "exec_with_pipe: setenv(TERM) failed");
+				if (setenv("LINES", lines.c_str(), 1) == -1)
+					error_exit(true, "exec_with_pipe: setenv(LINES) failed");
 
-                if (dir.empty() == false && chdir(dir.c_str()) == -1)
-                        error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
+				if (setenv("TERM", "ansi", 1) == -1)
+					error_exit(true, "exec_with_pipe: setenv(TERM) failed");
 
-                close(2);
-                (void)open("/dev/null", O_WRONLY);
+				if (dir.empty() == false && chdir(dir.c_str()) == -1)
+					error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
 
-                // TODO: a smarter way?
-                int fd_max = sysconf(_SC_OPEN_MAX);
-                for(int fd=3; fd<fd_max; fd++)
-                        close(fd);
+				close(2);
+				(void)open("/dev/null", O_WRONLY);
 
-                std::vector<std::string> parts = split(command, " ");
+				// TODO: a smarter way?
+				int fd_max = sysconf(_SC_OPEN_MAX);
+				for(int fd=3; fd<fd_max; fd++)
+					close(fd);
 
-                size_t n_args = parts.size();
-                char **pars = new char *[n_args + 1];
-                for(size_t i=0; i<n_args; i++)
-                        pars[i] = (char *)parts.at(i).c_str();
-                pars[n_args] = nullptr;
+				std::vector<std::string> parts = split(command, " ");
 
-                if (execv(pars[0], &pars[0]) == -1) {
-			std::string error = myformat("CANNOT INVOKE \"%s\"!", command.c_str());
+				size_t n_args = parts.size();
+				char **pars = new char *[n_args + 1];
+				for(size_t i=0; i<n_args; i++)
+					pars[i] = (char *)parts.at(i).c_str();
+				pars[n_args] = nullptr;
 
-			write(fd_master, error.c_str(), error.size());
+				if (execv(pars[0], &pars[0]) == -1) {
+					std::string error = myformat("CANNOT INVOKE \"%s\"!", command.c_str());
 
-                        error_exit(true, "Failed to invoke %s", command.c_str());
+					write(fd_master, error.c_str(), error.size());
+
+					error_exit(true, "Failed to invoke %s", command.c_str());
+				}
+			}
+
+			if (waitpid(child_pid, nullptr, 0) == -1)
+				error_exit(true, "waitpid failed");
+
+			if (restart_interval > 0)
+				sleep(restart_interval);
 		}
         }
 

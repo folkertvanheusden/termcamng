@@ -44,6 +44,9 @@ ssh-keys: keys/
 #exec-command: /usr/bin/httping -Q -K 192.168.64.100
 exec-command: /usr/bin/htop -d 5
 directory: /tmp
+# how long to wait (in seconds) before restarting the exec-command when it has stopped
+# set to -1 to disable this
+restart-interval: -1
 
 logging:
   file: termcamng.log

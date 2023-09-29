@@ -517,6 +517,18 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 					fflush(stdout);
 				}
 
+#ifdef LOG_TRAFFIC
+				{
+					FILE *fh = fopen("traffic.log", "a+");
+
+					if (fh) {
+						fprintf(fh, "%s", data.c_str());
+
+						fclose(fh);
+					}
+				}
+#endif
+
 				std::lock_guard(clients->lock);
 
 				for(auto & client : clients->clients) {
@@ -583,6 +595,7 @@ int main(int argc, char *argv[])
 
 		std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
 		std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
+		int restart_interval   = yaml_get_int(config, "restart-interval", "when the command terminates, how long to wait (in seconds) to restart it, set to -1 to disable restarting");
 
 		// configure logfile
 		YAML::Node cfg_log     = yaml_get_yaml_node(config, "logging",    "configuration of logging output");
@@ -601,7 +614,7 @@ int main(int argc, char *argv[])
 		// main functionality
 		clients_t clients;
 
-		auto proc             = exec_with_pipe(command, directory, width, height);
+		auto proc             = exec_with_pipe(command, directory, width, height, restart_interval);
 		int  program_fd       = std::get<1>(proc);
 
 		std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
