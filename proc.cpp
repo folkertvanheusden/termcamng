@@ -15,7 +15,7 @@
 
 
 // this code needs more error checking TODO
-std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height, const int restart_interval)
+std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height, const int restart_interval, const bool stderr_to_stdout)
 {
 	int fd_master { -1 };
 
@@ -49,8 +49,10 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 				if (dir.empty() == false && chdir(dir.c_str()) == -1)
 					error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
 
-				close(2);
-				(void)open("/dev/null", O_WRONLY);
+				if (stderr_to_stdout == false) {
+					close(2);
+					(void)open("/dev/null", O_WRONLY);
+				}
 
 				// TODO: a smarter way?
 				int fd_max = sysconf(_SC_OPEN_MAX);

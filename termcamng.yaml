@@ -48,6 +48,8 @@ directory: /tmp
 # set to -1 to disable this
 restart-interval: -1
 
+stderr-to-stdout: true
+
 logging:
   file: termcamng.log
   loglevel-files: debug
