@@ -391,6 +391,37 @@ void terminal::emit_character(const uint32_t c)
 	last_character = c;
 }
 
+void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines)
+{
+	if (move_to_left)
+		x = 0;
+
+	for(int i=0; i<n_lines; i++) {
+		y++;
+
+		if (y >= h) {
+			if (do_scroll)
+				delete_line(0);
+
+			y = h - 1;
+
+		}
+	}
+}
+
+void terminal::do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines)
+{
+	if (move_to_left)
+		x = 0;
+
+	for(int i=0; i<n_lines; i++) {
+		if (y)
+			y--;
+		else if (do_scroll)
+			insert_line(0);
+	}
+}
+
 std::optional<std::string> terminal::process_escape_CSI(const char cmd, const std::string & parameters)
 {
 	std::optional<std::string> send_back;
@@ -407,20 +438,10 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		par2 = std::atoi(pars[1].c_str());
 
 	if (cmd == 'A') {  // cursor up
-		y -= evaluate_n(par1);
-
-		if (y < 0) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = 0;
-		}
+		do_prev_line(false, false, evaluate_n(par1));
 	}
 	else if (cmd == 'B') {  // cursor down
-		y += evaluate_n(par1);
-
-		if (y >= h) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1;
-		}
+		do_next_line(false, false, evaluate_n(par1));
 	}
 	else if (cmd == 'b') { // repeat
 		int n = evaluate_n(par1);
@@ -457,14 +478,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'E') {  // Move cursor to the beginning of the line n lines down
-		y += evaluate_n(par1);
-
-		if (y >= h) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1;
-		}
-
-		x = 0;
+		do_next_line(true, false, evaluate_n(par1));
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
 		x = par1.has_value() ? par1.value() - 1 : 0;
@@ -549,7 +563,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		for(int cx=start_x; cx<end_x; cx++)
 			erase_cell(cx, y);
 	}
-	else if (cmd == 'L') {
+	else if (cmd == 'L') {  // insert lines
 		int n = evaluate_n(par1);
 
 		for(int i=0; i<n; i++)
@@ -569,7 +583,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
-	else if (cmd == 'M') {
+	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
 
 		for(int i=0; i<n; i++)
@@ -777,22 +791,10 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			}
 			else if (escape_type == ET_NONE) {
 				if (in[i] == 'D' || in[i] == 'E') {  // IND index / NEL next line
-					y++;
-
-					if (in[i] == 'E')
-						x = 0;
-					
-					if (y >= h) {
-						delete_line(0);
-						y = h - 1;
-
-					}
+					do_next_line(in[i] == 'E', true, 1);  // x=0 and scroll, 1 line
 				}
 				else if (in[i] == 'M') {  // RI, reverse index
-					if (y)
-						y--;
-					else
-						insert_line(0);
+					do_prev_line(false, true, 1);
 				}
 				else if (in[i] == 'P')  // DCS, terminated by ST
 					escape_type = ET_DCS;

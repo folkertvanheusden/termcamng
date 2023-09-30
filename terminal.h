@@ -83,6 +83,9 @@ public:
 
 	void emit_character(const uint32_t c);
 
+	void do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines);
+	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);
+
 	std::optional<std::string> process_escape_CSI(const char cmd, const std::string & parameters);
 	std::optional<std::string> process_escape(const char cmd, const char G);
 
