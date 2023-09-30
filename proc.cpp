@@ -28,37 +28,37 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 		error_exit(true, "exec_with_pipe: forkpty failed");
 
         if (pid == 0) {
+		setsid();
+
+		std::string columns = myformat("%d", width);
+		std::string lines   = myformat("%d", height);
+
+		if (setenv("COLUMNS", columns.c_str(), 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(COLUMNS) failed");
+
+		if (setenv("LINES", lines.c_str(), 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(LINES) failed");
+
+		if (setenv("TERM", "ansi", 1) == -1)
+			error_exit(true, "exec_with_pipe: setenv(TERM) failed");
+
+		if (dir.empty() == false && chdir(dir.c_str()) == -1)
+			error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
+
+		if (stderr_to_stdout == false) {
+			close(2);
+			(void)open("/dev/null", O_WRONLY);
+		}
+
+		// TODO: a smarter way?
+		int fd_max = sysconf(_SC_OPEN_MAX);
+		for(int fd=3; fd<fd_max; fd++)
+			close(fd);
+
 		for(;restart_interval >= 0;) {
 			pid_t child_pid = fork();
 
 			if (child_pid == 0) {
-				setsid();
-
-				std::string columns = myformat("%d", width);
-				std::string lines   = myformat("%d", height);
-
-				if (setenv("COLUMNS", columns.c_str(), 1) == -1)
-					error_exit(true, "exec_with_pipe: setenv(COLUMNS) failed");
-
-				if (setenv("LINES", lines.c_str(), 1) == -1)
-					error_exit(true, "exec_with_pipe: setenv(LINES) failed");
-
-				if (setenv("TERM", "ansi", 1) == -1)
-					error_exit(true, "exec_with_pipe: setenv(TERM) failed");
-
-				if (dir.empty() == false && chdir(dir.c_str()) == -1)
-					error_exit(true, "exec_with_pipe: chdir to %s for %s failed", dir.c_str(), command.c_str());
-
-				if (stderr_to_stdout == false) {
-					close(2);
-					(void)open("/dev/null", O_WRONLY);
-				}
-
-				// TODO: a smarter way?
-				int fd_max = sysconf(_SC_OPEN_MAX);
-				for(int fd=3; fd<fd_max; fd++)
-					close(fd);
-
 				std::vector<std::string> parts = split(command, " ");
 
 				size_t n_args = parts.size();
