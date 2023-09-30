@@ -369,9 +369,14 @@ int evaluate_n(const std::optional<int> & in)
 void terminal::emit_character(const uint32_t c)
 {
 	if (x >= w) {
-		x = 0;
+		if (wraparound) {
+			x = 0;
 
-		y++;
+			y++;
+		}
+		else {
+			x = w - 1;  // will be put back to w below
+		}
 	}
 
 	screen[y * w + x].c           = c;
@@ -551,6 +556,18 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 			insert_line(y);
 
 		x = 0;
+	}
+	else if (cmd == 'h') {
+		if (parameters == "?7")
+			wraparound = true;
+		else
+			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
+	}
+	else if (cmd == 'l') {
+		if (parameters == "?7")
+			wraparound = false;
+		else
+			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
 	else if (cmd == 'M') {
 		int n = evaluate_n(par1);

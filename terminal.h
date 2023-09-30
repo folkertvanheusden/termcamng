@@ -53,6 +53,7 @@ private:
 	bool              OSC         { false };
 	bool              blink_state { false };
 	uint64_t          blink_switch_ts { 0 };
+	bool              wraparound  { true  };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
