@@ -743,6 +743,16 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	return send_back;
 }
 
+std::optional<std::string> terminal::process_escape(const char cmd, const char G)
+{
+	if (cmd == 'A' || cmd == 'B' || cmd == '0' || cmd == '1' || cmd == '2')
+		return { };
+
+	dolog(ll_info, "Escape %c %c not supported", G, cmd);
+
+	return { };
+}
+
 std::optional<std::string> terminal::process_input(const char *const in, const size_t len)
 {
 	std::optional<std::string> send_back;
@@ -780,10 +790,26 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			}
 		}
 		else if (in[i] == '[' && escape_state == E_ESC)
-			escape_state = E_BRACKET, utf8_len = 0;
-		else if (escape_state == E_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {
+			escape_state = E_SQ_BRACKET, utf8_len = 0;
+		else if (in[i] == '(' && escape_state == E_ESC)
+			escape_state = E_R1_BRACKET, utf8_len = 0;
+		else if (in[i] == ')' && escape_state == E_ESC)
+			escape_state = E_R2_BRACKET, utf8_len = 0;
+		else if (escape_state == E_R1_BRACKET) {
+			process_escape(in[i], '(');
+
+			escape_state = E_NONE;
+			escape_value.clear();
+		}
+		else if (escape_state == E_R2_BRACKET) {
+			process_escape(in[i], ')');
+
+			escape_state = E_NONE;
+			escape_value.clear();
+		}
+		else if (escape_state == E_SQ_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {
 			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';' || in[i] == '?') {
-				if (escape_state == E_BRACKET)
+				if (escape_state == E_SQ_BRACKET)
 					escape_state = E_VALUES;
 
 				escape_value += in[i];

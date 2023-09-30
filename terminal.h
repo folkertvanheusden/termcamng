@@ -18,7 +18,7 @@
 #define A_STRIKETHROUGH (1 << 4)
 #define A_BLINK         (1 << 5)
 
-typedef enum { E_NONE, E_ESC, E_BRACKET, E_VALUES } escape_state_t;
+typedef enum { E_NONE, E_ESC, E_SQ_BRACKET, E_R1_BRACKET, E_R2_BRACKET, E_VALUES } escape_state_t;
 
 typedef struct {
 	uint32_t c;
@@ -83,6 +83,7 @@ public:
 	void emit_character(const uint32_t c);
 
 	std::optional<std::string> process_escape(const char cmd, const std::string & parameters, const bool is_short);
+	std::optional<std::string> process_escape(const char cmd, const char G);
 
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
