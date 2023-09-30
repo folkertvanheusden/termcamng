@@ -339,7 +339,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 	printf("process_ssh: thread terminating\n");
 }
 
-void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients)
+void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients, const bool telnet_workarounds)
 {
 	int client_fd = -1;
 
@@ -456,17 +456,22 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 						telnet_recv = true;
 						telnet_left = 2;
 					}
-					else if (ignore_keypresses == false && WRITE(program_fd, &c, 1) != 1) {
-						assert(telnet_recv == false);
-						assert(telnet_left == 0);
+					else if (ignore_keypresses == false)  {
+						if (telnet_workarounds && c == 0)
+							continue;
 
-						if (client_fd != -1)  {
-							close(client_fd);
+						if (WRITE(program_fd, &c, 1) != 1) {
+							assert(telnet_recv == false);
+							assert(telnet_left == 0);
 
-							client_fd = 1;
+							if (client_fd != -1)  {
+								close(client_fd);
+
+								client_fd = 1;
+							}
+
+							stop = true;  // program went away
 						}
-
-						stop = true;  // program went away
 					}
 				}
 			}
@@ -586,6 +591,8 @@ int main(int argc, char *argv[])
 
 		const bool dumb_telnet        = yaml_get_bool(config,   "dumb-telnet",  "dumb, slow refresh for telnet sessions; this may increase compatibility with differing resolutions");
 
+		const bool telnet_workarounds = yaml_get_bool(config,   "telnet-workarounds", "e.g. filter spurious 0x00");
+
 		const bool ignore_keypresses  = yaml_get_bool(config,   "ignore-keypresses", "should key-presses from telnet/ssh clients be ignored");
 
 		signal(SIGINT,  signal_handler);
@@ -620,18 +627,18 @@ int main(int argc, char *argv[])
 
 		std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
-		std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients] {
+		std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients, telnet_workarounds] {
 				set_thread_name("telnet");
 
 				if (telnet_port != 0)
-				process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients);
+					process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients, telnet_workarounds);
 				});
 
 		std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, ignore_keypresses, &clients] {
 				set_thread_name("ssh");
 
 				if (ssh_port != 0)
-				process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, ignore_keypresses, &clients);
+					process_ssh(&t, ssh_keys, ssh_bind, ssh_port, program_fd, dumb_telnet, ignore_keypresses, &clients);
 				});
 
 		http_server_parameters_t server_parameters { 0 };

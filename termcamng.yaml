@@ -27,6 +27,9 @@ dumb-telnet: true
 # sessions
 ignore-keypresses: false
 
+# filter spurious 0x00 from telnet session to program
+telnet-workarounds: true
+
 http-addr: 127.0.0.1
 http-port: 8080
 
