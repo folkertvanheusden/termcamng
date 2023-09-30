@@ -17,6 +17,7 @@
 #define A_UNDERLINE     (1 << 3)
 #define A_STRIKETHROUGH (1 << 4)
 #define A_BLINK         (1 << 5)
+#define A_ITALIC        (1 << 6)
 
 typedef enum { ET_NONE, ET_DCS, ET_CSI, ET_ST, ET_OSC } escape_type_t;
 
