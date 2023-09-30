@@ -635,6 +635,10 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 					else
 						dolog(ll_info, "rgb selection failed (%d,%d / %d)", fg_col_ansi, bg_col_ansi, is_fg);
 				}
+				else if (par_val == 3)  // italic on
+					attr |= A_ITALIC;
+				else if (par_val == 23)  // italic off
+					attr &= ~A_ITALIC;
 				else if (par_val == 4)  // underline on
 					attr |= A_UNDERLINE;
 				else if (par_val == 24)  // underline off
@@ -969,6 +973,8 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 
 			int     x            = cx * char_w;
 			int     y            = cy * char_h;
+
+			// TODO: italic (A_ITALIC)
 
 			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, fg, bg, x, y, *out, *out_w, *out_h)) {
 				// TODO

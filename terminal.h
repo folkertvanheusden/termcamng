@@ -17,6 +17,7 @@
 #define A_UNDERLINE     (1 << 3)
 #define A_STRIKETHROUGH (1 << 4)
 #define A_BLINK         (1 << 5)
+#define A_ITALIC        (1 << 6)
 
 typedef enum { E_NONE, E_ESC, E_SQ_BRACKET, E_R1_BRACKET, E_R2_BRACKET, E_VALUES } escape_state_t;
 
