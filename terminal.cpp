@@ -773,12 +773,13 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			}
 			else if (in[i] >= 0x40 && in[i] <= 0x7e) {
 				// because of 'b'
-				std::string temp = escape_value;
-
-				send_back = process_escape(in[i], temp, escape_state == E_ESC);
+				std::string temp        = escape_value;
+				bool        e_state_esc = escape_state == E_ESC;
 
 				escape_state = E_NONE;
 				escape_value.clear();
+
+				send_back = process_escape(in[i], temp, e_state_esc);
 			}
 			else {
 				dolog(ll_info, "escape [%s%c not supported", escape_value.c_str(), in[i]);
