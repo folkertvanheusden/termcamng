@@ -23,6 +23,8 @@ add_executable(termcamng
 	logging.cpp
 	main.cpp
 	net.cpp
+	net-io.cpp
+	net-io-fd.cpp
 	picio.cpp
 	proc.cpp
 	str.cpp

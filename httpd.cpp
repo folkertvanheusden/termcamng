@@ -12,14 +12,17 @@
 #include "io.h"
 #include "logging.h"
 #include "net.h"
+#include "net-io-fd.h"
 #include "str.h"
 
 
-httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, const int fd, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters) :
+httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters) :
 	url_map(url_map),
 	parameters(parameters)
 {
 	server_fd = start_tcp_listen(bind_interface, bind_port);
+
+	io = new net_io_fd(server_fd);
 
 	th = new std::thread(std::ref(*this));
 }
@@ -30,6 +33,8 @@ httpd::~httpd()
 
 	th->join();
 	delete th;
+
+	delete io;
 
 	close(server_fd);
 }
@@ -82,7 +87,7 @@ void httpd::handle_request(const int fd)
 		return;
 	}
 
-	it->second(request.at(1), fd, parameters, stop_flag);
+	it->second(request.at(1), io, parameters, stop_flag);
 }
 
 void httpd::operator()()
