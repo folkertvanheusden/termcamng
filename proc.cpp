@@ -1,7 +1,9 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <pty.h>
 #include <stdlib.h>
 #include <string>
+#include <string.h>
 #include <tuple>
 #include <unistd.h>
 #include <vector>
@@ -11,6 +13,7 @@
 #include <sys/wait.h>
 
 #include "error.h"
+#include "io.h"
 #include "str.h"
 
 
@@ -55,7 +58,7 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 		for(int fd=3; fd<fd_max; fd++)
 			close(fd);
 
-		for(;restart_interval >= 0;) {
+		do {
 			pid_t child_pid = fork();
 
 			if (child_pid == 0) {
@@ -68,10 +71,12 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 				pars[n_args] = nullptr;
 
 				if (execv(pars[0], &pars[0]) == -1) {
-					std::string error = myformat("CANNOT INVOKE \"%s\"!", command.c_str());
+					int e = errno;
+					std::string error = myformat("CANNOT INVOKE \"%s\"! (%s)", command.c_str(), strerror(e));
 
-					write(fd_master, error.c_str(), error.size());
+					WRITE(fd_master, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
 
+					errno = e;
 					error_exit(true, "Failed to invoke %s", command.c_str());
 				}
 			}
@@ -82,6 +87,9 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 			if (restart_interval > 0)
 				sleep(restart_interval);
 		}
+		while(restart_interval >= 0);
+
+		exit(1);
         }
 
         std::tuple<pid_t, int, int> out(pid, fd_master, fd_master);
