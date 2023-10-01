@@ -15,6 +15,7 @@ set(CMAKE_BUILD_TYPE Debug)
 add_compile_options(-Wall -pedantic)
 
 add_executable(termcamng
+	BearSSLHelpers.cpp
 	error.cpp
 	font.cpp
 	http.cpp
@@ -33,6 +34,8 @@ add_executable(termcamng
 	utils.cpp
 	yaml-helpers.cpp
 	)
+
+target_link_libraries(termcamng -lbearssl)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
