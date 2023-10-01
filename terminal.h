@@ -19,7 +19,7 @@
 #define A_BLINK         (1 << 5)
 #define A_ITALIC        (1 << 6)
 
-typedef enum { E_NONE, E_ESC, E_SQ_BRACKET, E_R1_BRACKET, E_R2_BRACKET, E_VALUES } escape_state_t;
+typedef enum { ET_NONE, ET_DCS, ET_CSI, ET_ST, ET_OSC } escape_type_t;
 
 typedef struct {
 	uint32_t c;
@@ -38,8 +38,9 @@ private:
 	pos_t            *screen { nullptr };
 	int               x { 0 };
 	int               y { 0 };
-	escape_state_t    escape_state { E_NONE };
+	escape_type_t     escape_type { ET_NONE };
 	std::string       escape_value;
+	bool              escape      { false };
 	int               fg_col_ansi { 37 };
 	rgb_t             fg_rgb      { 255, 255, 255 };
 	int               bg_col_ansi { 40 };
@@ -83,8 +84,10 @@ public:
 
 	void emit_character(const uint32_t c);
 
-	std::optional<std::string> process_escape(const char cmd, const std::string & parameters, const bool is_short);
-	std::optional<std::string> process_escape(const char cmd, const char G);
+	void do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines);
+	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);
+
+	std::optional<std::string> process_escape_CSI(const char cmd, const std::string & parameters);
 
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);

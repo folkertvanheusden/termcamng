@@ -391,7 +391,38 @@ void terminal::emit_character(const uint32_t c)
 	last_character = c;
 }
 
-std::optional<std::string> terminal::process_escape(const char cmd, const std::string & parameters, const bool is_short)
+void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines)
+{
+	if (move_to_left)
+		x = 0;
+
+	for(int i=0; i<n_lines; i++) {
+		y++;
+
+		if (y >= h) {
+			if (do_scroll)
+				delete_line(0);
+
+			y = h - 1;
+
+		}
+	}
+}
+
+void terminal::do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines)
+{
+	if (move_to_left)
+		x = 0;
+
+	for(int i=0; i<n_lines; i++) {
+		if (y)
+			y--;
+		else if (do_scroll)
+			insert_line(0);
+	}
+}
+
+std::optional<std::string> terminal::process_escape_CSI(const char cmd, const std::string & parameters)
 {
 	std::optional<std::string> send_back;
 
@@ -407,20 +438,10 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		par2 = std::atoi(pars[1].c_str());
 
 	if (cmd == 'A') {  // cursor up
-		y -= evaluate_n(par1);
-
-		if (y < 0) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = 0;
-		}
+		do_prev_line(false, false, evaluate_n(par1));
 	}
 	else if (cmd == 'B') {  // cursor down
-		y += evaluate_n(par1);
-
-		if (y >= h) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1;
-		}
+		do_next_line(false, false, evaluate_n(par1));
 	}
 	else if (cmd == 'b') { // repeat
 		int n = evaluate_n(par1);
@@ -457,14 +478,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		}
 	}
 	else if (cmd == 'E') {  // Move cursor to the beginning of the line n lines down
-		y += evaluate_n(par1);
-
-		if (y >= h) {
-			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1;
-		}
-
-		x = 0;
+		do_next_line(true, false, evaluate_n(par1));
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
 		x = par1.has_value() ? par1.value() - 1 : 0;
@@ -549,7 +563,7 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		for(int cx=start_x; cx<end_x; cx++)
 			erase_cell(cx, y);
 	}
-	else if (cmd == 'L') {
+	else if (cmd == 'L') {  // insert lines
 		int n = evaluate_n(par1);
 
 		for(int i=0; i<n; i++)
@@ -569,26 +583,13 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
-	else if (cmd == 'M') {
+	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
 
-		if (is_short) {
-			for(int i=0; i<n; i++) {
-				y--;
+		for(int i=0; i<n; i++)
+			delete_line(y);
 
-				if (y < 0) {
-					y = 0;
-
-					insert_line(0);
-				}
-			}
-		}
-		else {
-			for(int i=0; i<n; i++)
-				delete_line(y);
-
-			x = 0;
-		}
+		x = 0;
 	}
 	else if (cmd == 'm') {
 		if (pars.empty())
@@ -747,21 +748,12 @@ std::optional<std::string> terminal::process_escape(const char cmd, const std::s
 	return send_back;
 }
 
-std::optional<std::string> terminal::process_escape(const char cmd, const char G)
-{
-	if (cmd == 'A' || cmd == 'B' || cmd == '0' || cmd == '1' || cmd == '2')
-		return { };
-
-	dolog(ll_info, "Escape %c %c not supported", G, cmd);
-
-	return { };
-}
-
 std::optional<std::string> terminal::process_input(const char *const in, const size_t len)
 {
 	std::optional<std::string> send_back;
 
 	for(size_t i=0; i<len; i++) {
+		// C0
 		if (in[i] == 13)  // carriage return
 			x = 0, utf8_len = 0;
 		else if (in[i] == 10)  // new line
@@ -783,57 +775,54 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 
 			utf8_len = 0;
 		}
-		// ANSI escape handling
-		else if (in[i] == 27 && escape_state == E_NONE)
-			escape_state = E_ESC, utf8_len = 0;
-		else if (OSC) {
-			// < 32: any other C1 character can terminate a sequence (https://vt100.net/docs/vt510-rm/chapter4.html)
-			if ((escape_state == E_ESC && in[i] == '\\') || in[i] < 32){
-				OSC = false;
-				escape_state = E_NONE;
-			}
-		}
-		else if (in[i] == '[' && escape_state == E_ESC)
-			escape_state = E_SQ_BRACKET, utf8_len = 0;
-		else if (in[i] == '(' && escape_state == E_ESC)
-			escape_state = E_R1_BRACKET, utf8_len = 0;
-		else if (in[i] == ')' && escape_state == E_ESC)
-			escape_state = E_R2_BRACKET, utf8_len = 0;
-		else if (escape_state == E_R1_BRACKET) {
-			process_escape(in[i], '(');
-
-			escape_state = E_NONE;
-			escape_value.clear();
-		}
-		else if (escape_state == E_R2_BRACKET) {
-			process_escape(in[i], ')');
-
-			escape_state = E_NONE;
-			escape_value.clear();
-		}
-		else if (escape_state == E_SQ_BRACKET || escape_state == E_VALUES || escape_state == E_ESC) {
-			if ((in[i] >= '0' && in[i] <= '9') || in[i] == ';' || in[i] == '?') {
-				if (escape_state == E_SQ_BRACKET)
-					escape_state = E_VALUES;
-
-				escape_value += in[i];
-			}
-			else if (in[i] >= 0x40 && in[i] <= 0x7e) {
-				// because of 'b'
-				std::string temp        = escape_value;
-				bool        e_state_esc = escape_state == E_ESC;
-
-				escape_state = E_NONE;
-				escape_value.clear();
-
-				send_back = process_escape(in[i], temp, e_state_esc);
-			}
-			else {
-				dolog(ll_info, "escape [%s%c not supported", escape_value.c_str(), in[i]);
-
-				escape_state = E_NONE;
+		// Fe
+		else if (escape == true) {
+			if (in[i] == 27) {  // escape in an escape, should be DCS or OSC
+				escape_type = ET_NONE;
 				escape_value.clear();
 			}
+			else if (escape_type == ET_NONE) {
+				if (in[i] == 'D' || in[i] == 'E') {  // IND index / NEL next line
+					do_next_line(in[i] == 'E', true, 1);  // x=0 and scroll, 1 line
+				}
+				else if (in[i] == 'M') {  // RI, reverse index
+					do_prev_line(false, true, 1);
+				}
+				else if (in[i] == 'P')  // DCS, terminated by ST
+					escape_type = ET_DCS;
+				else if (in[i] == '[')  // constrol sequence introduceer, "Starts most of the useful sequences, terminated by a byte in the range 0x40 through 0x7E"
+					escape_type = ET_CSI;
+				else if (in[i] == '\\') { // ST
+					escape_type = ET_NONE;
+					escape = false;
+				}
+				else if (in[i] == ']')  // OSC
+					escape_type = ET_OSC;
+				else {
+					send_back = { in[i] };
+
+					dolog(ll_info, "Escape Fe %c not supported, parameters: <%s>", in[i], escape_value.c_str());
+
+					escape = false;
+				}
+			}
+			else if (escape_type == ET_DCS) {
+			}
+			else if (escape_type == ET_CSI) {
+				if (in[i] >= 0x40 && in[i] <= 0x7e) {
+					send_back = process_escape_CSI(in[i], escape_value);
+
+					escape = false;
+				}
+				else {
+					escape_value += in[i];
+				}
+			}
+		}
+		else if (in[i] == 27) {
+			escape = true;
+			escape_type = ET_NONE;
+			escape_value.clear();
 
 			utf8_len = 0;
 		}
