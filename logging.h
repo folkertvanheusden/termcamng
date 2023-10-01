@@ -11,7 +11,6 @@ log_level_t str_to_ll(const std::string & name);
 std::string ll_to_str(const log_level_t ll);
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
 void setloguid(const int uid, const int gid);
-void closelog();
 void DOLOG(const log_level_t ll, const char *fmt, ...);
 bool log_enabled(const log_level_t ll);
 
