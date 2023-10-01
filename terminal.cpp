@@ -799,7 +799,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				else if (in[i] == ']')  // OSC
 					escape_type = ET_OSC;
 				else {
-					send_back = { in[i] };
+					emit_character(in[i]);
 
 					dolog(ll_info, "Escape Fe %c not supported, parameters: <%s>", in[i], escape_value.c_str());
 
