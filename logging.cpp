@@ -15,14 +15,13 @@
 #include "time.h"
 
 
-const char              *logfile = strdup("termcamng.log");
-log_level_t              log_level_file   = ll_warning;
-log_level_t              log_level_screen = ll_warning;
-static FILE             *lfh = nullptr;
-static int               lf_uid = 0;
-static int               lf_gid = 0;
-static std::atomic_bool  flush_thread_stop { false };
-static std::thread      *flush_thread      { nullptr };
+const char  *logfile = strdup("termcamng.log");
+log_level_t  log_level_file   = ll_warning;
+log_level_t  log_level_screen = ll_warning;
+static FILE *lfh = nullptr;
+static int   lf_uid = 0;
+static int   lf_gid = 0;
+static bool  ug_id_changed = false;
 
 std::string ll_to_str(const log_level_t ll)
 {
@@ -60,43 +59,13 @@ log_level_t str_to_ll(const std::string & name)
 	throw myformat("str_to_ll: \"%s\" is not recognized as a log-level", name.c_str());
 }
 
-static void stop_flush_thread()
-{
-	if (flush_thread) {
-		flush_thread_stop = true;
-
-		flush_thread->join();
-		delete flush_thread;
-
-		flush_thread = nullptr;
-	}
-}
-
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen)
 {
-	if (lfh) {
-		stop_flush_thread();
-
-		fclose(lfh);
-		lfh = nullptr;
-	}
-
-	if (!flush_thread) {
-		flush_thread_stop = false;
-
-		flush_thread = new std::thread([] {
-				while(!flush_thread_stop) {
-					sleep(1);
-					fflush(lfh);
-				}
-			});
-	}
-
 	free(const_cast<char *>(logfile));
 
 	logfile = strdup(lf);
 
-	log_level_file = ll_file;
+	log_level_file   = ll_file;
 	log_level_screen = ll_screen;
 }
 
@@ -106,34 +75,24 @@ void setloguid(const int uid, const int gid)
 	lf_gid = gid;
 }
 
-void closelog()
-{
-	stop_flush_thread();
-
-	if (lfh) {
-		fclose(lfh);
-		lfh = nullptr;
-	}
-
-	free(const_cast<char *>(logfile));
-}
-
 void DOLOG(const log_level_t ll, const char *fmt, ...)
 {
+	lfh = fopen(logfile, "a+");
 	if (!lfh) {
-		lfh = fopen(logfile, "a+");
-		if (!lfh) {
-			fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
-			exit(1);
-		}
+		fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
+		exit(1);
+	}
+
+	if (ug_id_changed == false) {
+		ug_id_changed = true;
 
 		if (fchown(fileno(lfh), lf_uid, lf_gid) == -1)
 			fprintf(stderr, "Cannot change logfile (%s) ownership: %s\n", logfile, strerror(errno));
+	}
 
-		if (fcntl(fileno(lfh), F_SETFD, FD_CLOEXEC) == -1) {
-			fprintf(stderr, "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
-			exit(1);
-		}
+	if (fcntl(fileno(lfh), F_SETFD, FD_CLOEXEC) == -1) {
+		fprintf(stderr, "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
+		exit(1);
 	}
 
 	uint64_t now = get_us();
@@ -158,18 +117,16 @@ void DOLOG(const log_level_t ll, const char *fmt, ...)
 	(void)vasprintf(&str, fmt, ap);
 	va_end(ap);
 
-	if (ll >= log_level_file) {
+	if (ll >= log_level_file)
 		fprintf(lfh, "%s%s\n", ts_str, str);
-
-		if (ll >= ll_warning)
-			fflush(lfh);
-	}
 
 	if (ll >= log_level_screen)
 		printf("%s%s\n", ts_str, str);
 
 	free(str);
 	free(ts_str);
+
+	fclose(lfh);
 }
 
 bool log_enabled(const log_level_t ll)
