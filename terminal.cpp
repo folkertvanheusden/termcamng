@@ -748,16 +748,6 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	return send_back;
 }
 
-std::optional<std::string> terminal::process_escape(const char cmd, const char G)
-{
-	if (cmd == 'A' || cmd == 'B' || cmd == '0' || cmd == '1' || cmd == '2')
-		return { };
-
-	dolog(ll_info, "Escape %c %c not supported", G, cmd);
-
-	return { };
-}
-
 std::optional<std::string> terminal::process_input(const char *const in, const size_t len)
 {
 	std::optional<std::string> send_back;
@@ -787,8 +777,6 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		}
 		// Fe
 		else if (escape == true) {
-			// dolog(ll_debug, "%d %c/%d %d", escape, in[i] > 32 ? in[i] : ' ', in[i], escape_type);
-
 			if (in[i] == 27) {  // escape in an escape, should be DCS or OSC
 				escape_type = ET_NONE;
 				escape_value.clear();
@@ -804,8 +792,10 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 					escape_type = ET_DCS;
 				else if (in[i] == '[')  // constrol sequence introduceer, "Starts most of the useful sequences, terminated by a byte in the range 0x40 through 0x7E"
 					escape_type = ET_CSI;
-				else if (in[i] == '\\')  // ST
+				else if (in[i] == '\\') { // ST
 					escape_type = ET_NONE;
+					escape = false;
+				}
 				else if (in[i] == ']')  // OSC
 					escape_type = ET_OSC;
 				else {

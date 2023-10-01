@@ -88,7 +88,6 @@ public:
 	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);
 
 	std::optional<std::string> process_escape_CSI(const char cmd, const std::string & parameters);
-	std::optional<std::string> process_escape(const char cmd, const char G);
 
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
