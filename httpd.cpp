@@ -22,8 +22,6 @@ httpd::httpd(const std::string & bind_interface, const int bind_port, const std:
 {
 	server_fd = start_tcp_listen(bind_interface, bind_port);
 
-	io = new net_io_fd(server_fd);
-
 	th = new std::thread(std::ref(*this));
 }
 
@@ -34,19 +32,17 @@ httpd::~httpd()
 	th->join();
 	delete th;
 
-	delete io;
-
 	close(server_fd);
 }
 
-void httpd::handle_request(const int fd)
+void httpd::handle_request(net_io *const io)
 {
 	std::string request_headers;
 
 	while(request_headers.find("\r\n\r\n") == std::string::npos) {
 		char buffer[4096];
 
-		int rrc = read(fd, buffer, sizeof buffer);
+		int rrc = io->read(reinterpret_cast<uint8_t *>(buffer), sizeof buffer);
 		if (rrc == 0)  // connection close before request headers have been received
 			return;
 
@@ -69,7 +65,7 @@ void httpd::handle_request(const int fd)
 	if (request.at(0) == "HEAD") {
 		std::string reply = "HTTP/1.0 200 OK\r\n";
 
-		WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
 		return;
 	}
@@ -82,7 +78,7 @@ void httpd::handle_request(const int fd)
 	if (it == url_map.end()) {
 		std::string reply = "HTTP/1.0 404 OK\r\n";
 
-		WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
 		return;
 	}
@@ -109,7 +105,11 @@ void httpd::operator()()
 			dolog(ll_info, "httpd::operator: accept failed: %s", strerror(errno));
 		else {
 			std::thread request_handler([this, client_fd] {
-					handle_request(client_fd);
+					net_io *io = new net_io_fd(client_fd);
+
+					handle_request(io);
+
+					delete io;
 					close(client_fd);
 					});
 

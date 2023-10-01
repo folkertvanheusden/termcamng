@@ -11,5 +11,5 @@ public:
 	virtual ~net_io_fd();
 
 	bool send(const uint8_t *const out, const size_t n) override;
-	std::optional<uint8_t> read() override;
+	bool read(uint8_t *const out, const size_t n) override;
 };

@@ -17,13 +17,9 @@ bool net_io_fd::send(const uint8_t *const out, const size_t n)
 	return WRITE(fd, out, n) == ssize_t(n);
 }
 
-std::optional<uint8_t> net_io_fd::read()
+bool net_io_fd::read(uint8_t *const out, const size_t n)
 {
-	uint8_t b = 0;
-	int rc = ::read(fd, &b, 1);
+	int rc = ::read(fd, out, n);
 
-	if (rc == 1)
-		return b;
-
-	return { };
+	return rc >= 1;
 }

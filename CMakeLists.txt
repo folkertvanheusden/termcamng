@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions("-D_FILE_OFFSET_BITS=64")
 
-add_definitions("-DLOG_TRAFFIC")
+#add_definitions("-DLOG_TRAFFIC")
 
 set(CMAKE_BUILD_TYPE Debug)
 
