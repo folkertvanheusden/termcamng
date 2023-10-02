@@ -6,6 +6,7 @@ font-files:
 
 local-output: false
 
+# become daemon?
 fork: false
 
 width: 80
@@ -32,6 +33,13 @@ telnet-workarounds: true
 
 http-addr: 127.0.0.1
 http-port: 8080
+
+# set https-port to a non-0 value if you want to enable
+# the https-server (e.g 443)
+https-port: 0
+# https-addr: 127.0.0.1
+# https-key:
+# https-certificate:
 
 # set to 0 to let the server only transmit a
 # frame when a change is detected

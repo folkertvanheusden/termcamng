@@ -3,7 +3,8 @@
 #include <stdlib.h>
 
 #include "http.h"
-#include "io.h"
+#include "logging.h"
+#include "net-io.h"
 #include "picio.h"
 #include "str.h"
 #include "terminal.h"
@@ -49,7 +50,7 @@ std::pair<uint8_t *, size_t> get_png_frame(terminal *const t, uint64_t *const ts
 	return { reinterpret_cast<uint8_t *>(data_out), data_out_len };
 }
 
-void get_html_root(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
+void get_html_root(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	std::string reply = 
 			"HTTP/1.0 200 OK\r\n"
@@ -62,10 +63,10 @@ void get_html_root(const std::string url, const int fd, const void *const parame
 			"</body>"
 			"</html>";
 
-	WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+	io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-void get_frame_jpeg(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
+void get_frame_jpeg(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -77,13 +78,13 @@ void get_frame_jpeg(const std::string url, const int fd, const void *const param
 			"Content-Type: image/jpeg\r\n"
 			"\r\n";
 
-	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) == reply.size())
-		WRITE(fd, jpeg.first, jpeg.second);
+	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
+		io->send(jpeg.first, jpeg.second);
 
 	free(jpeg.first);
 }
 
-void get_frame_png(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
+void get_frame_png(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -95,13 +96,13 @@ void get_frame_png(const std::string url, const int fd, const void *const parame
 			"Content-Type: image/png\r\n"
 			"\r\n";
 
-	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) == reply.size())
-		WRITE(fd, png.first, png.second);
+	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
+		io->send(png.first, png.second);
 
 	free(png.first);
 }
 
-void stream_frames(const int fd, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
+void stream_frames(net_io *const io, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
 {
 	std::string reply =
 		"HTTP/1.0 200 OK\r\n"
@@ -113,8 +114,10 @@ void stream_frames(const int fd, const http_server_parameters_t *const parameter
 		"Content-Type: multipart/x-mixed-replace; boundary=myboundary\r\n"
 		"\r\n";
 
-	if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) != reply.size())
+	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
+		dolog(ll_debug, "stream_frames: failed sending http headers");
 		return;
+	}
 
 	uint64_t ts = 0;
 
@@ -123,13 +126,17 @@ void stream_frames(const int fd, const http_server_parameters_t *const parameter
 
 		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", type == sct_mpng ? "png" : "jpeg", image.second);
 
-		if (size_t(WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size())) != reply.size()) {
+		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
+			dolog(ll_debug, "stream_frames: failed sending multipart http headers");
+
 			free(image.first);
 
 			break;
 		}
 
-		if (size_t(WRITE(fd, image.first, image.second)) != image.second) {
+		if (io->send(image.first, image.second) == false) {
+			dolog(ll_debug, "stream_frames: failed sending frame data");
+
 			free(image.first);
 
 			break;
@@ -139,7 +146,7 @@ void stream_frames(const int fd, const http_server_parameters_t *const parameter
 	}
 }
 
-void get_stream(const std::string url, const int fd, const void *const parameters, std::atomic_bool & stop_flag)
+void get_stream(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -158,12 +165,12 @@ void get_stream(const std::string url, const int fd, const void *const parameter
 		sct = sct_mpng;
 
 	if (sct != sct_none)
-		stream_frames(fd, hsp, sct, stop_flag);
+		stream_frames(io, hsp, sct, stop_flag);
 }
 
-httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp)
+httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp, const std::optional<std::pair<std::string, std::string> > tls_key_certificate)
 {
-	std::map<std::string, std::function<void (const std::string url, const int fd, const void *, std::atomic_bool & stop_flag)> > url_map;
+	std::map<std::string, std::function<void (const std::string url, net_io *const io, const void *, std::atomic_bool & stop_flag)> > url_map;
 
 	url_map.insert({ "/",             get_html_root });
 	url_map.insert({ "/index.html",   get_html_root });
@@ -172,7 +179,7 @@ httpd * start_http_server(const std::string & bind_ip, const int http_port, http
 	url_map.insert({ "/stream.mjpeg", get_stream });
 	url_map.insert({ "/stream.mpng",  get_stream });
 
-	return new httpd(bind_ip, http_port, url_map, hsp);
+	return new httpd(bind_ip, http_port, url_map, hsp, tls_key_certificate);
 }
 
 void stop_http_server(httpd *const h)

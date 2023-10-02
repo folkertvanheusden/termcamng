@@ -12,12 +12,15 @@
 #include "io.h"
 #include "logging.h"
 #include "net.h"
+#include "net-io-bearssl.h"
+#include "net-io-fd.h"
 #include "str.h"
 
 
-httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, const int fd, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters) :
+httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters, const std::optional<std::pair<std::string, std::string> > tls_key_certificate) :
 	url_map(url_map),
-	parameters(parameters)
+	parameters(parameters),
+	tls_key_certificate(tls_key_certificate)
 {
 	server_fd = start_tcp_listen(bind_interface, bind_port);
 
@@ -34,19 +37,21 @@ httpd::~httpd()
 	close(server_fd);
 }
 
-void httpd::handle_request(const int fd)
+void httpd::handle_request(net_io *const io)
 {
 	std::string request_headers;
 
 	while(request_headers.find("\r\n\r\n") == std::string::npos) {
 		char buffer[4096];
 
-		int rrc = read(fd, buffer, sizeof buffer);
-		if (rrc == 0)  // connection close before request headers have been received
+		int rrc = io->read(reinterpret_cast<uint8_t *>(buffer), sizeof buffer);
+		if (rrc == 0) {  // connection close before request headers have been received
+			dolog(ll_info, "httpd::handle_request: connection closed");
 			return;
+		}
 
 		if (rrc == -1) {
-			dolog(ll_info, "httpd::handle_request: read failed: %s", strerror(errno));
+			dolog(ll_info, "httpd::handle_request: read failed");
 			break;
 		}
 
@@ -54,35 +59,47 @@ void httpd::handle_request(const int fd)
 	}
 
 	auto request_lines = split(request_headers, "\r\n");
-	if (request_lines.size() == 0)
-		return;
+	if (request_lines.size() == 0) {
+		request_lines = split(request_headers, "\n");
+
+		if (request_lines.size() == 0) {
+			dolog(ll_info, "httpd::handle_request: end of request headers not found");
+			return;
+		}
+	}
 
 	auto request = split(request_lines.at(0), " ");
-	if (request.size() != 3)
+	if (request.size() < 3) {
+		dolog(ll_info, "httpd::handle_request: request line malformed");
 		return;
+	}
 
 	if (request.at(0) == "HEAD") {
 		std::string reply = "HTTP/1.0 200 OK\r\n";
 
-		WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
 		return;
 	}
 
-	if (request.at(0) != "GET")
+	if (request.at(0) != "GET") {
+		dolog(ll_info, "httpd::handle_request: not a GET/HEAD request");
 		return;
+	}
 
 	auto it = url_map.find(request.at(1));
 
 	if (it == url_map.end()) {
 		std::string reply = "HTTP/1.0 404 OK\r\n";
 
-		WRITE(fd, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+		dolog(ll_debug, "httpd::handle_request: url not found");
+
+		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
 		return;
 	}
 
-	it->second(request.at(1), fd, parameters, stop_flag);
+	it->second(request.at(1), io, parameters, stop_flag);
 }
 
 void httpd::operator()()
@@ -100,15 +117,26 @@ void httpd::operator()()
 
 		int client_fd = accept(server_fd, nullptr, nullptr);
 
-		if (client_fd == -1)
+		if (client_fd == -1) {
 			dolog(ll_info, "httpd::operator: accept failed: %s", strerror(errno));
-		else {
-			std::thread request_handler([this, client_fd] {
-					handle_request(client_fd);
-					close(client_fd);
-					});
-
-			request_handler.detach();
+			continue;
 		}
+
+		std::thread request_handler([this, client_fd] {
+				net_io *io = nullptr;
+
+				if (tls_key_certificate.has_value())
+					io = new net_io_bearssl(client_fd, tls_key_certificate->first, tls_key_certificate->second);
+				else
+					io = new net_io_fd(client_fd);
+
+				handle_request(io);
+
+				delete io;
+
+				close(client_fd);
+			});
+
+		request_handler.detach();
 	}
 }
