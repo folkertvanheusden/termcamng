@@ -578,7 +578,18 @@ int main(int argc, char *argv[])
 		const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
 
 		const std::string http_bind   = yaml_get_string(config, "http-addr",    "network interface (IP address) to let the http port bind to");
-		const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG rendering of terminal");
+		const int http_port           = yaml_get_int(config,    "http-port",    "HTTP port to serve PNG/JPEG rendering of terminal");
+
+		std::string https_bind;
+		std::string https_key;
+		std::string https_cert;
+		int https_port                = yaml_get_int(config,    "https-port",    "HTTPS port to serve PNG/JPEG rendering of terminal");
+		if (https_port != 0) {
+			https_bind = yaml_get_string(config, "http-addr",  "network interface (IP address) to let the http port bind to");
+
+			https_key  = yaml_get_string(config, "https-key",         "https private key");
+			https_cert = yaml_get_string(config, "https-certificate", "https certificate");
+		}
 
 		const int minimum_fps         = yaml_get_int(config,    "minimum-fps",  "minimum number of frame per second; set to 0 to not control this");
 
@@ -602,12 +613,12 @@ int main(int argc, char *argv[])
 
 		const std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
 		const std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
-		const int restart_interval   = yaml_get_int(config, "restart-interval", "when the command terminates, how long to wait (in seconds) to restart it, set to -1 to disable restarting");
+		const int restart_interval   = yaml_get_int(config,     "restart-interval", "when the command terminates, how long to wait (in seconds) to restart it, set to -1 to disable restarting");
 		const bool stderr_to_stdout  = yaml_get_bool(config,    "stderr-to-stdout", "when set to true, stderr is visible. when set to false, stderr is send to /dev/null");
 
 		// configure logfile
 		YAML::Node cfg_log     = yaml_get_yaml_node(config, "logging",    "configuration of logging output");
-		std::string logfile    = yaml_get_string(cfg_log, "file",         "file to log to");
+		std::string logfile    = yaml_get_string(cfg_log,   "file",       "file to log to");
 
 		log_level_t ll_file    = str_to_ll(yaml_get_string(cfg_log, "loglevel-files",  "log-level for log-file"));
 		log_level_t ll_screen  = str_to_ll(yaml_get_string(cfg_log, "loglevel-screen", "log-level for screen output"));
@@ -646,7 +657,31 @@ int main(int argc, char *argv[])
 		server_parameters.compression_level = compression_level;
 		server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
-		httpd *h = start_http_server(http_bind, http_port, &server_parameters);
+		httpd *s_h = { nullptr };
+
+		httpd *h   = start_http_server(http_bind, http_port, &server_parameters, { });
+
+		if (https_port != 0) {
+			if (https_cert.empty())
+				error_exit(true, "Need to select either both certificate and key-file");
+
+			auto https_cert_contents = load_text_file(https_cert);
+
+			if (https_cert_contents.has_value() == false)
+				error_exit(true, "Could not load https cert file");
+
+			if (https_key.empty())
+				error_exit(true, "Need to select either both certificate and key-file");
+
+			auto https_key_contents = load_text_file(https_key);
+
+			if (https_key_contents.has_value() == false)
+				error_exit(true, "Could not load https key file");
+
+			std::optional<std::pair<std::string, std::string> > tls_key_certificate = { { https_key_contents.value(), https_cert_contents.value() } };
+
+			s_h = start_http_server(https_bind, https_port, &server_parameters, tls_key_certificate);
+		}
 
 		while(!stop)
 			sleep(1);
@@ -656,6 +691,9 @@ int main(int argc, char *argv[])
 		telnet_thread_handle.join();
 
 		read_program.join();
+
+		if (s_h)
+			stop_http_server(s_h);
 
 		stop_http_server(h);
 	}

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <unistd.h>
 
 #include "io.h"
@@ -17,9 +18,7 @@ bool net_io_fd::send(const uint8_t *const out, const size_t n)
 	return WRITE(fd, out, n) == ssize_t(n);
 }
 
-bool net_io_fd::read(uint8_t *const out, const size_t n)
+int net_io_fd::read(uint8_t *const out, const size_t n)
 {
-	int rc = ::read(fd, out, n);
-
-	return rc >= 1;
+	return ::read(fd, out, n);
 }

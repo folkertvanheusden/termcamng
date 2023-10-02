@@ -11,5 +11,5 @@ public:
 	virtual ~net_io();
 
 	virtual bool send(const uint8_t *const out, const size_t n) = 0;
-	virtual bool read(uint8_t *const out, const size_t n) = 0;
+	virtual int  read(uint8_t *const out, const size_t n) = 0;
 };

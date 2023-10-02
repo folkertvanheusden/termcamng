@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "http.h"
+#include "logging.h"
 #include "net-io.h"
 #include "picio.h"
 #include "str.h"
@@ -113,8 +114,10 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 		"Content-Type: multipart/x-mixed-replace; boundary=myboundary\r\n"
 		"\r\n";
 
-	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false)
+	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
+		dolog(ll_debug, "stream_frames: failed sending http headers");
 		return;
+	}
 
 	uint64_t ts = 0;
 
@@ -124,12 +127,16 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", type == sct_mpng ? "png" : "jpeg", image.second);
 
 		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
+			dolog(ll_debug, "stream_frames: failed sending multipart http headers");
+
 			free(image.first);
 
 			break;
 		}
 
 		if (io->send(image.first, image.second) == false) {
+			dolog(ll_debug, "stream_frames: failed sending frame data");
+
 			free(image.first);
 
 			break;
@@ -161,7 +168,7 @@ void get_stream(const std::string url, net_io *const io, const void *const param
 		stream_frames(io, hsp, sct, stop_flag);
 }
 
-httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp)
+httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp, const std::optional<std::pair<std::string, std::string> > tls_key_certificate)
 {
 	std::map<std::string, std::function<void (const std::string url, net_io *const io, const void *, std::atomic_bool & stop_flag)> > url_map;
 
@@ -172,7 +179,7 @@ httpd * start_http_server(const std::string & bind_ip, const int http_port, http
 	url_map.insert({ "/stream.mjpeg", get_stream });
 	url_map.insert({ "/stream.mpng",  get_stream });
 
-	return new httpd(bind_ip, http_port, url_map, hsp);
+	return new httpd(bind_ip, http_port, url_map, hsp, tls_key_certificate);
 }
 
 void stop_http_server(httpd *const h)

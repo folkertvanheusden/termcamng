@@ -17,7 +17,7 @@ int sock_write(void *ctx, const unsigned char *buf, size_t len)
 {
 	int fd = *reinterpret_cast<int *>(ctx);
 
-	return WRITE(fd, buf, len);
+	return write(fd, buf, len);
 }
 
 net_io_bearssl::net_io_bearssl(const int fd, const std::string & private_key, const std::string & certificate) : fd(fd)
@@ -56,6 +56,8 @@ net_io_bearssl::net_io_bearssl(const int fd, const std::string & private_key, co
 
 net_io_bearssl::~net_io_bearssl()
 {
+	br_sslio_close(&ioc);
+
 	delete pk;
 
 	delete c;
@@ -63,10 +65,20 @@ net_io_bearssl::~net_io_bearssl()
 
 bool net_io_bearssl::send(const uint8_t *const out, const size_t n)
 {
-	return br_sslio_write_all(&ioc, out, n) == n;
+	int rc = br_sslio_write_all(&ioc, out, n);
+
+	if (rc == n) {
+		br_sslio_flush(&ioc);
+
+		return true;
+	}
+
+	dolog(ll_debug, "net_io_bearssl::send: filed transmitting %zu bytes: %d", n, rc);
+
+	return false;
 }
 
-bool net_io_bearssl::read(uint8_t *const out, const size_t n)
+int net_io_bearssl::read(uint8_t *const out, const size_t n)
 {
-	return br_sslio_read(&ioc, out, n) > 0;
+	return br_sslio_read(&ioc, out, n);
 }
