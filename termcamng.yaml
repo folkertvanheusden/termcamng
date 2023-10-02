@@ -6,6 +6,7 @@ font-files:
 
 local-output: false
 
+# become daemon?
 fork: false
 
 width: 80
@@ -34,7 +35,7 @@ http-addr: 127.0.0.1
 http-port: 8080
 
 # set https-port to a non-0 value if you want to enable
-# the https-server
+# the https-server (e.g 443)
 https-port: 0
 # https-addr: 127.0.0.1
 # https-key:
