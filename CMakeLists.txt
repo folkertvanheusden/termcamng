@@ -25,6 +25,7 @@ add_executable(termcamng
 	main.cpp
 	net.cpp
 	net-io.cpp
+	net-io-bearssl.cpp
 	net-io-fd.cpp
 	picio.cpp
 	proc.cpp
