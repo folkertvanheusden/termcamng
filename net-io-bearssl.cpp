@@ -67,13 +67,13 @@ bool net_io_bearssl::send(const uint8_t *const out, const size_t n)
 {
 	int rc = br_sslio_write_all(&ioc, out, n);
 
-	if (rc == n) {
+	if (rc == 0) {
 		br_sslio_flush(&ioc);
 
 		return true;
 	}
 
-	dolog(ll_debug, "net_io_bearssl::send: filed transmitting %zu bytes: %d", n, rc);
+	dolog(ll_debug, "net_io_bearssl::send: failed transmitting %zu bytes: %d", n, rc);
 
 	return false;
 }

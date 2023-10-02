@@ -56,7 +56,6 @@ void httpd::handle_request(net_io *const io)
 		}
 
 		request_headers += std::string(buffer, rrc);
-		printf("%s", std::string(buffer, rrc).c_str());
 	}
 
 	auto request_lines = split(request_headers, "\r\n");
@@ -118,25 +117,26 @@ void httpd::operator()()
 
 		int client_fd = accept(server_fd, nullptr, nullptr);
 
-		if (client_fd == -1)
+		if (client_fd == -1) {
 			dolog(ll_info, "httpd::operator: accept failed: %s", strerror(errno));
-		else {
-			std::thread request_handler([this, client_fd] {
-					net_io *io = nullptr;
-
-					if (tls_key_certificate.has_value())
-						io = new net_io_bearssl(client_fd, tls_key_certificate->first, tls_key_certificate->second);
-					else
-						io = new net_io_fd(client_fd);
-
-					handle_request(io);
-
-					delete io;
-
-					close(client_fd);
-					});
-
-			request_handler.detach();
+			continue;
 		}
+
+		std::thread request_handler([this, client_fd] {
+				net_io *io = nullptr;
+
+				if (tls_key_certificate.has_value())
+					io = new net_io_bearssl(client_fd, tls_key_certificate->first, tls_key_certificate->second);
+				else
+					io = new net_io_fd(client_fd);
+
+				handle_request(io);
+
+				delete io;
+
+				close(client_fd);
+			});
+
+		request_handler.detach();
 	}
 }
