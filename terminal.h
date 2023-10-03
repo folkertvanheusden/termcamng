@@ -56,7 +56,8 @@ private:
 	bool              blink_state { false };
 	uint64_t          blink_switch_ts { 0 };
 	bool              wraparound  { true  };
-	std::vector<bool> tab_stops;
+	std::vector<bool> h_tab_stops;
+	std::vector<bool> v_tab_stops;
 	bool              global_invert    { false };  // DECSNM
 	bool		  smooth_scrolling { false };  // DECSCLM
 	int               origin_x    { 0 };
@@ -89,7 +90,8 @@ public:
 
 	void emit_character(const uint32_t c);
 
-	void reset_tab_stops();
+	void reset_h_tab_stops();
+	void reset_v_tab_stops();
 
 	void resize_width(const int new_w);
 

@@ -20,11 +20,13 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 	for(int i=0; i<w * h; i++)
 		screen[i].c = ' ';
 
-	reset_tab_stops();
+	reset_h_tab_stops();
+
+	reset_v_tab_stops();
 
 	// default a tab-stop every 8th position? TODO
 	for(int i=0; i<w; i += 8)
-		tab_stops.at(i) = true;
+		h_tab_stops.at(i) = true;
 
 	color_map[0][0] = {   0,   0,   0 };  // black
 	color_map[0][1] = { 170,   0,   0 };  // red
@@ -305,7 +307,7 @@ void terminal::resize_width(const int new_w)
 	delete [] screen;
 
 	w = new_w;
-	tab_stops.resize(w);
+	h_tab_stops.resize(w);
 
 	screen = new pos_t[w * h]();
 
@@ -313,11 +315,18 @@ void terminal::resize_width(const int new_w)
 		screen[i].c = ' ';
 }
 
-void terminal::reset_tab_stops()
+void terminal::reset_h_tab_stops()
 {
-	tab_stops.clear();
+	h_tab_stops.clear();
 
-	tab_stops.resize(w);
+	h_tab_stops.resize(w);
+}
+
+void terminal::reset_v_tab_stops()
+{
+	v_tab_stops.clear();
+
+	v_tab_stops.resize(h);
 }
 
 std::pair<int, int> terminal::get_current_xy()
@@ -769,6 +778,10 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			screen[offset + i].attr        = attr;
 		}
 	}
+	else if (cmd == 'Y') {  // vertical tab, CVT
+		while(y < h - origin_y && v_tab_stops.at(y + origin_y) == false)
+			y++;
+	}
 	else if (cmd == 'P') {  // delete character
 		int n = evaluate_n(par1);
 
@@ -785,12 +798,16 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'g') {  // tabulation clear, TBC
 		if (par1.has_value()) {
 			if (par1.value() == 0)
-				tab_stops.at(x) = false;
-			else if (par1.value() == 3)
-				reset_tab_stops();
+				h_tab_stops.at(x + origin_x) = false;
+			else if (par1.value() == 1)
+				v_tab_stops.at(y + origin_y) = false;
+			else if (par1.value() == 3)  // all character tabulation stops are cleared
+				reset_h_tab_stops();
+			else if (par1.value() == 4)  // all line tabulation stops are cleared
+				reset_v_tab_stops();
 		}
 		else {
-			tab_stops.at(x) = false;
+			h_tab_stops.at(origin_x + x) = false;
 		}
 	}
 	else {
@@ -821,7 +838,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			utf8_len = 0;
 		}
 		else if (in[i] == 9) {  // tab
-			while(x < w - origin_x && tab_stops.at(x + origin_x) == false)
+			while(x < w - origin_x && h_tab_stops.at(x + origin_x) == false)
 				x++;
 
 			utf8_len = 0;
@@ -850,7 +867,9 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				else if (in[i] == ']')  // OSC
 					escape_type = ET_OSC;
 				else if (in[i] == 'H')  // HTS, horizontal tab set
-					tab_stops.at(origin_x + x) = true;
+					h_tab_stops.at(origin_x + x) = true;
+				else if (in[i] == 'J')  // VTS, vertical tab set
+					v_tab_stops.at(origin_y + y) = true;
 				else {
 					emit_character(in[i]);
 
