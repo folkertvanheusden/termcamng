@@ -57,7 +57,10 @@ private:
 	uint64_t          blink_switch_ts { 0 };
 	bool              wraparound  { true  };
 	std::vector<bool> tab_stops;
-	bool              global_invert_DECSNM { false };
+	bool              global_invert    { false };  // DECSNM
+	bool		  smooth_scrolling { false };  // DECSCLM
+	int               origin_x    { 0 };
+	int               origin_y    { 0 };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
