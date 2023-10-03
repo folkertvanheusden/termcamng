@@ -20,6 +20,12 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 	for(int i=0; i<w * h; i++)
 		screen[i].c = ' ';
 
+	reset_tab_stops();
+
+	// default a tab-stop every 8th position? TODO
+	for(int i=0; i<w; i += 8)
+		tab_stops.at(i) = true;
+
 	color_map[0][0] = {   0,   0,   0 };  // black
 	color_map[0][1] = { 170,   0,   0 };  // red
 	color_map[0][2] = {   0, 170,   0 };  // green
@@ -292,6 +298,13 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 terminal::~terminal()
 {
 	delete [] screen;
+}
+
+void terminal::reset_tab_stops()
+{
+	tab_stops.clear();
+
+	tab_stops.resize(w);
 }
 
 std::pair<int, int> terminal::get_current_xy()
@@ -739,6 +752,17 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == ']') {  // "operating system command", terminated with ST (ESC \)
 		OSC = true;
 	}
+	else if (cmd == 'g') {  // tabulation clear, TBC
+		if (par1.has_value()) {
+			if (par1.value() == 0)
+				tab_stops.at(x) = false;
+			else if (par1.value() == 3)
+				reset_tab_stops();
+		}
+		else {
+			tab_stops.at(x) = false;
+		}
+	}
 	else {
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
 
@@ -767,11 +791,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			utf8_len = 0;
 		}
 		else if (in[i] == 9) {  // tab
-			x &= ~7;
-			x += 8;
-
-			if (x >= w)
-				x -= w, y++;
+			while(x < w && tab_stops.at(x) == false)
+				x++;
 
 			utf8_len = 0;
 		}
@@ -798,6 +819,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				}
 				else if (in[i] == ']')  // OSC
 					escape_type = ET_OSC;
+				else if (in[i] == 'H')  // HTS, horizontal tab set
+					tab_stops.at(x) = true;
 				else {
 					emit_character(in[i]);
 

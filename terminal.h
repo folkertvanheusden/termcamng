@@ -56,6 +56,7 @@ private:
 	bool              blink_state { false };
 	uint64_t          blink_switch_ts { 0 };
 	bool              wraparound  { true  };
+	std::vector<bool> tab_stops;
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
@@ -83,6 +84,8 @@ public:
 	void erase_line(const int cy);
 
 	void emit_character(const uint32_t c);
+
+	void reset_tab_stops();
 
 	void do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines);
 	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);
