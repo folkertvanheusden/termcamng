@@ -24,9 +24,12 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 
 	reset_v_tab_stops();
 
-	// default a tab-stop every 8th position? TODO
+	// default a h-tab-stop every 8th position? TODO
 	for(int i=0; i<w; i += 8)
 		h_tab_stops.at(i) = true;
+	// default a v-tab-stop every line? TODO
+	for(int i=0; i<h; i++)
+		v_tab_stops.at(i) = true;
 
 	color_map[0][0] = {   0,   0,   0 };  // black
 	color_map[0][1] = { 170,   0,   0 };  // red
@@ -846,6 +849,17 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				x++;
 
 			utf8_len = 0;
+		}
+		else if (in[i] == 11) {  // ^K, vtab
+			while(y < h - origin_y) {
+				y++;
+
+				if (v_tab_stops.at(y + origin_y))
+					break;
+			}
+
+			if (y >= h - origin_y)
+				y = h - origin_y;
 		}
 		// Fe
 		else if (escape == true) {
