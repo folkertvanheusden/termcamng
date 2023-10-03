@@ -2,8 +2,8 @@ what it is
 ----------
 
 This program runs an other program in an emulated ANSI terminal.
-The terminal is rendered to a PNG file which is then served via a http-
-(web-)server.
+The terminal is rendered to a PNG file which is then served via a
+http-/https- (web-)server.
 You can connect to it using an SSH or telnet program and then interact
 with the program that is running.
 The internal SSH server authenticats via PAM against the local user-
@@ -43,8 +43,8 @@ Note that you need to generate host-keys for the SSH functionality
 to work (see "ssh-keygen -A").
 
 
-http
-----
+http/https
+----------
 
  * http://ip-adres/frame.png     <-- 1 PNG frame
  * http://ip-adres/stream.mpng   <-- stream of PNG images
@@ -56,6 +56,10 @@ demo
 ----
 
 http://vps001.vanheusden.com:8888/stream.mjpeg
+
+or via https:
+
+https://vps001.vanheusden.com:4433/stream.mjpeg
 
 Note: it works fine with the chrome browser on Linux. Current (Feb.
 2022) Firefox browsers sometimes show only a partial part of the
