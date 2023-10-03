@@ -797,14 +797,18 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	}
 	else if (cmd == 'g') {  // tabulation clear, TBC
 		if (par1.has_value()) {
-			if (par1.value() == 0)
+			if (par1.value() == 0)  // the character tabulation stop at the active presentation position is cleared
 				h_tab_stops.at(x + origin_x) = false;
-			else if (par1.value() == 1)
+			else if (par1.value() == 1)  // the line tabulation stop at the active line is cleared
 				v_tab_stops.at(y + origin_y) = false;
 			else if (par1.value() == 3)  // all character tabulation stops are cleared
 				reset_h_tab_stops();
 			else if (par1.value() == 4)  // all line tabulation stops are cleared
 				reset_v_tab_stops();
+			else if (par1.value() == 5) {  // all tabulation stops are cleared
+				reset_h_tab_stops();
+				reset_v_tab_stops();
+			}
 		}
 		else {
 			h_tab_stops.at(origin_x + x) = false;
