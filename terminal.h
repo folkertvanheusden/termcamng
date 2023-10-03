@@ -57,6 +57,7 @@ private:
 	uint64_t          blink_switch_ts { 0 };
 	bool              wraparound  { true  };
 	std::vector<bool> tab_stops;
+	bool              global_invert_DECSNM { false };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;

@@ -601,6 +601,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			wraparound = true;
 		else if (parameters == "?3")  // DECCOLM
 			resize_width(132), x = 0, y = 0;
+		else if (parameters == "?5")  // DECSNM
+			global_invert_DECSNM = true;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -609,6 +611,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			wraparound = false;
 		else if (parameters == "?3")  // DECCOLM
 			resize_width(80), x = 0, y = 0;
+		else if (parameters == "?5")  // DECSNM
+			global_invert_DECSNM = false;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -1001,6 +1005,9 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 
 			int     x            = cx * char_w;
 			int     y            = cy * char_h;
+
+			if (global_invert_DECSNM)
+				std::swap(fg, bg);
 
 			// TODO: italic (A_ITALIC)
 
