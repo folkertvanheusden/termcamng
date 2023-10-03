@@ -33,8 +33,8 @@ typedef struct {
 class terminal {
 private:
 	font       *const f { nullptr };
-	const int         w { 80 };
-	const int         h { 25 };
+	int               w { 80 };
+	int               h { 25 };
 	pos_t            *screen { nullptr };
 	int               x { 0 };
 	int               y { 0 };
@@ -86,6 +86,8 @@ public:
 	void emit_character(const uint32_t c);
 
 	void reset_tab_stops();
+
+	void resize_width(const int new_w);
 
 	void do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines);
 	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);

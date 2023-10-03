@@ -300,6 +300,18 @@ terminal::~terminal()
 	delete [] screen;
 }
 
+void terminal::resize_width(const int new_w)
+{
+	delete [] screen;
+
+	w = new_w;
+
+	screen = new pos_t[w * h]();
+
+	for(int i=0; i<w * h; i++)
+		screen[i].c = ' ';
+}
+
 void terminal::reset_tab_stops()
 {
 	tab_stops.clear();
@@ -587,12 +599,16 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'h') {
 		if (parameters == "?7")
 			wraparound = true;
+		else if (parameters == "?3")  // DECCOLM
+			resize_width(132), x = 0, y = 0;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
 	else if (cmd == 'l') {
 		if (parameters == "?7")
 			wraparound = false;
+		else if (parameters == "?3")  // DECCOLM
+			resize_width(80), x = 0, y = 0;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
