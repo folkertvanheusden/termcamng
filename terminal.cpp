@@ -310,6 +310,7 @@ void terminal::resize_width(const int new_w)
 	delete [] screen;
 
 	w = new_w;
+
 	h_tab_stops.resize(w);
 
 	screen = new pos_t[w * h]();
@@ -339,8 +340,8 @@ std::pair<int, int> terminal::get_current_xy()
 
 void terminal::delete_line(const int y)
 {
-	int offset_to   = (y + origin_y) * w;
-	int offset_from = (y + origin_y + 1) * w;
+	int offset_to   = y * w;
+	int offset_from = (y + 1) * w;
 
 	int n_characters_to_move = w * h - offset_from;
 
@@ -355,8 +356,8 @@ void terminal::delete_line(const int y)
 
 void terminal::insert_line(const int y)
 {
-	int offset_to    = (y + origin_y + 1) * w;
-	int offset_from  = (y + origin_y) * w;
+	int offset_to    = (y + 1) * w;
+	int offset_from  = y * w;
 
 	int n_characters_to_move = w * h - offset_to;
 
@@ -368,9 +369,9 @@ void terminal::insert_line(const int y)
 
 void terminal::insert_character(const int n)
 {
-	int n_left      = w - (origin_x + x + 1);
-	int offset_from = (y + origin_y) * w + origin_x + x;
-	int offset_to   = (y + origin_y) * w + origin_x + x + 1;
+	int n_left      = w - x - 1;
+	int offset_from = y * w + x;
+	int offset_to   = y * w + x + 1;
 
 	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
@@ -381,9 +382,9 @@ void terminal::insert_character(const int n)
 
 void terminal::delete_character(const int n)
 {
-	int n_left      = w - (x + origin_x);
-	int offset_to   = (y + origin_y) * w + origin_x + x;
-	int offset_from = (y + origin_y) * w + origin_x + x + 1;
+	int n_left      = w - x;
+	int offset_to   = y * w + x;
+	int offset_from = y * w + x + 1;
 
 	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
@@ -406,7 +407,7 @@ int evaluate_n(const std::optional<int> & in)
 
 void terminal::emit_character(const uint32_t c)
 {
-	if (origin_x + x >= w - origin_x) {
+	if (x >= w) {
 		if (wraparound) {
 			x = 0;
 
@@ -417,12 +418,12 @@ void terminal::emit_character(const uint32_t c)
 		}
 	}
 
-	screen[(y + origin_y) * w + x + origin_x].c           = c;
-	screen[(y + origin_y) * w + x + origin_x].fg_col_ansi = fg_col_ansi;
-	screen[(y + origin_y) * w + x + origin_x].fg_rgb      = fg_rgb;
-	screen[(y + origin_y) * w + x + origin_x].bg_col_ansi = bg_col_ansi;
-	screen[(y + origin_y) * w + x + origin_x].bg_rgb      = bg_rgb;
-	screen[(y + origin_y) * w + x + origin_x].attr        = attr;
+	screen[y * w + x].c           = c;
+	screen[y * w + x].fg_col_ansi = fg_col_ansi;
+	screen[y * w + x].fg_rgb      = fg_rgb;
+	screen[y * w + x].bg_col_ansi = bg_col_ansi;
+	screen[y * w + x].bg_rgb      = bg_rgb;
+	screen[y * w + x].attr        = attr;
 
 	x++;
 
@@ -437,11 +438,11 @@ void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const
 	for(int i=0; i<n_lines; i++) {
 		y++;
 
-		if (origin_y + y >= h - origin_y) {
+		if (y >= h) {
 			if (do_scroll)
 				delete_line(0);
 
-			y = h - 1 - origin_y;
+			y = h - 1;
 
 		}
 	}
@@ -512,7 +513,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 		else if (y >= h) {
 			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1 - origin_y;
+			y = h - 1;
 		}
 	}
 	else if (cmd == 'E') {  // Move cursor to the beginning of the line n lines down
@@ -527,7 +528,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 		else if (x >= w) {
 			dolog(ll_info, "%c: x=%d", cmd, x);
-			x = w - 1 - origin_x;
+			x = w - 1;
 		}
 	}
 	else if (cmd == 'H' || cmd == 'f') {  // set position  CUP
@@ -539,7 +540,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 		else if (y >= h) {
 			dolog(ll_info, "%c: y=%d", cmd, y);
-			y = h - 1 - origin_y;
+			y = h - 1;
 		}
 
 		x = par2.has_value() ? par2.value() - 1 : 0;
@@ -550,11 +551,10 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 		else if (x >= w) {
 			dolog(ll_info, "%c: x=%d", cmd, x);
-			x = w - 1 - origin_x;
+			x = w - 1;
 		}
 	}
 	else if (cmd == 'J') {
-		// TODO for origin_x/y
 		int val = par1.has_value() ? par1.value() : 0;
 
 		int start_pos = 0;
@@ -585,13 +585,13 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'K') {
 		int val = par1.has_value() ? par1.value() : 0;
 
-		int start_x = origin_x;
-		int end_x   = w - origin_x;
+		int start_x = 0;
+		int end_x   = w;
 
 		if (val == 0)
-			start_x = x + origin_x;
+			start_x = x;
 		else if (val == 1)
-			end_x   = x + 1 + origin_x;
+			end_x   = x + 1;
 		else if (val == 2) {
 			// use defaults
 		}
@@ -615,12 +615,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			wraparound = true;
 		else if (parameters == "?3")  // DECCOLM
 			resize_width(132), x = 0, y = 0;
-		else if (parameters == "?4")  // DECSCLM
-			smooth_scrolling = true;
 		else if (parameters == "?5")  // DECSNM
 			global_invert = true;
-		else if (parameters == "?6")  // DECOM
-			origin_x = x, origin_y = y;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -629,12 +625,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			wraparound = false;
 		else if (parameters == "?3")  // DECCOLM
 			resize_width(80), x = 0, y = 0;
-		else if (parameters == "?4")  // DECSCLM
-			smooth_scrolling = false;
 		else if (parameters == "?5")  // DECSNM
 			global_invert = false;
-		else if (parameters == "?6")  // DECOM
-			origin_x = 0, origin_y = 0;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -758,7 +750,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		if (par1 == 5)  // status report
 			send_back = "\033[0n";  // OK
 		else if (par1 == 6)  // report cursor position (CPR) [row;column]
-			send_back = myformat("\033[%d;%dR", origin_y + y + 1, origin_x + x + 1);
+			send_back = myformat("\033[%d;%dR", y + 1, x + 1);
 		else {
 			dolog(ll_info, "code %d for 'n' not supported", par1);
 		}
@@ -767,7 +759,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		send_back = "\033[?1;0c";
 	}
 	else if (cmd == 'X') {  // erase character
-		int offset = (y + origin_y) * w + x + origin_x;
+		int offset = y * w + x;
 
 		if (par1 == 0)
 			par1 = 1;
@@ -782,7 +774,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'Y') {  // vertical tab, CVT
-		while(y < h - origin_y && v_tab_stops.at(y + origin_y) == false)
+		while(y < h && v_tab_stops.at(y) == false)
 			y++;
 	}
 	else if (cmd == 'P') {  // delete character
@@ -801,9 +793,9 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'g') {  // tabulation clear, TBC
 		if (par1.has_value()) {
 			if (par1.value() == 0)  // the character tabulation stop at the active presentation position is cleared
-				h_tab_stops.at(x + origin_x) = false;
+				h_tab_stops.at(x) = false;
 			else if (par1.value() == 1)  // the line tabulation stop at the active line is cleared
-				v_tab_stops.at(y + origin_y) = false;
+				v_tab_stops.at(y) = false;
 			else if (par1.value() == 3)  // all character tabulation stops are cleared
 				reset_h_tab_stops();
 			else if (par1.value() == 4)  // all line tabulation stops are cleared
@@ -814,7 +806,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			}
 		}
 		else {
-			h_tab_stops.at(origin_x + x) = false;
+			h_tab_stops.at(x) = false;
 		}
 	}
 	else {
@@ -845,21 +837,21 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			utf8_len = 0;
 		}
 		else if (in[i] == 9) {  // tab
-			while(x < w - origin_x && h_tab_stops.at(x + origin_x) == false)
+			while(x < w && h_tab_stops.at(x) == false)
 				x++;
 
 			utf8_len = 0;
 		}
 		else if (in[i] == 11) {  // ^K, vtab
-			while(y < h - origin_y) {
+			while(y < h) {
 				y++;
 
-				if (v_tab_stops.at(y + origin_y))
+				if (v_tab_stops.at(y))
 					break;
 			}
 
-			if (y >= h - origin_y)
-				y = h - origin_y;
+			if (y >= h)
+				y = h - 1;
 		}
 		// Fe
 		else if (escape == true) {
@@ -885,9 +877,9 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				else if (in[i] == ']')  // OSC
 					escape_type = ET_OSC;
 				else if (in[i] == 'H')  // HTS, horizontal tab set
-					h_tab_stops.at(origin_x + x) = true;
+					h_tab_stops.at(x) = true;
 				else if (in[i] == 'J')  // VTS, vertical tab set
-					v_tab_stops.at(origin_y + y) = true;
+					v_tab_stops.at(y) = true;
 				else {
 					emit_character(in[i]);
 

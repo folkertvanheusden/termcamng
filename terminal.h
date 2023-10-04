@@ -60,8 +60,6 @@ private:
 	std::vector<bool> v_tab_stops;
 	bool              global_invert    { false };  // DECSNM
 	bool		  smooth_scrolling { false };  // DECSCLM
-	int               origin_x    { 0 };
-	int               origin_y    { 0 };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
