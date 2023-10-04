@@ -169,6 +169,8 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 				continue;
 			}
 
+			dolog(ll_info, "process_ssh: connected with %s", get_endpoint_name(client_fd).c_str());
+
 			ssh_session session = ssh_new();
 
 			int r = ssh_bind_accept_fd(sshbind, session, client_fd);
@@ -411,6 +413,8 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 			client_fd = accept(listen_fd, nullptr, nullptr);
 			fds[1].fd = client_fd;
+
+			dolog(ll_info, "process_telnet: connected with %s", get_endpoint_name(client_fd).c_str());
 
 			std::string setup   = setup_telnet_session();
 

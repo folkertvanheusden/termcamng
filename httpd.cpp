@@ -15,6 +15,7 @@
 #include "net-io-bearssl.h"
 #include "net-io-fd.h"
 #include "str.h"
+#include "time.h"
 
 
 httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters, const std::optional<std::pair<std::string, std::string> > tls_key_certificate) :
@@ -37,7 +38,7 @@ httpd::~httpd()
 	close(server_fd);
 }
 
-void httpd::handle_request(net_io *const io)
+void httpd::handle_request(net_io *const io, const std::string & endpoint)
 {
 	std::string request_headers;
 
@@ -92,12 +93,14 @@ void httpd::handle_request(net_io *const io)
 	if (it == url_map.end()) {
 		std::string reply = "HTTP/1.0 404 OK\r\n";
 
-		dolog(ll_debug, "httpd::handle_request: url not found");
+		dolog(ll_debug, "httpd::handle_request(%s): url %s not found", endpoint.c_str(), request.at(1).c_str());
 
 		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
 		return;
 	}
+
+	dolog(ll_info, "httpd::handle_request(%s): requested url %s", endpoint.c_str(), request.at(1).c_str());
 
 	it->second(request.at(1), io, parameters, stop_flag);
 }
@@ -123,6 +126,12 @@ void httpd::operator()()
 		}
 
 		std::thread request_handler([this, client_fd] {
+				auto  connection_start = get_ms();
+
+				std::string endpoint = get_endpoint_name(client_fd);
+
+				dolog(ll_info, "httpd::operator: connected with: %s", endpoint.c_str());
+
 				net_io *io = nullptr;
 
 				if (tls_key_certificate.has_value())
@@ -130,11 +139,13 @@ void httpd::operator()()
 				else
 					io = new net_io_fd(client_fd);
 
-				handle_request(io);
+				handle_request(io, endpoint);
 
 				delete io;
 
 				close(client_fd);
+
+				dolog(ll_info, "httpd::operator: disconnected from: %s (took: %.3f seconds)", endpoint.c_str(), (get_ms() - connection_start) / 1000.);
 			});
 
 		request_handler.detach();

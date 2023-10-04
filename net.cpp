@@ -1,3 +1,6 @@
+#include <cerrno>
+#include <cstring>
+#include <netdb.h>
 #include <string>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -41,4 +44,19 @@ int start_tcp_listen(const std::string & bind_to, const int listen_port)
                 error_exit(true, "start_tcp_listen: listen failed");
 
 	return listen_fd;
+}
+
+std::string get_endpoint_name(int fd)
+{
+	char host[256] { "? " };
+	char serv[256] { "? " };
+	struct sockaddr_in6 addr { 0 };
+	socklen_t addr_len = sizeof addr;
+
+	if (getpeername(fd, (struct sockaddr *)&addr, &addr_len) == -1)
+		snprintf(host, sizeof host, "[FAILED TO FIND NAME OF %d: %s (1)]", fd, strerror(errno));
+	else
+		getnameinfo((struct sockaddr *)&addr, addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+
+	return std::string(host) + "." + std::string(serv);
 }
