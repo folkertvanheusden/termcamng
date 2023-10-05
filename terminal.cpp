@@ -477,19 +477,26 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		par2 = std::atoi(pars[1].c_str());
 
 	if (cmd == 'A') {  // cursor up
-		do_prev_line(false, false, evaluate_n(par1));
+		int n = evaluate_n(par1);
+		DLD("CSI A (%d)", n);
+		do_prev_line(false, false, n);
 	}
 	else if (cmd == 'B') {  // cursor down
-		do_next_line(false, false, evaluate_n(par1));
+		int n = evaluate_n(par1);
+		DLD("CSI B (%d)", n);
+		do_next_line(false, false, n);
 	}
 	else if (cmd == 'b') { // repeat
 		int n = evaluate_n(par1);
+		DLD("CSI b (%d)", n);
 
 		for(int i=0; i<n; i++)
 			emit_character(last_character);
 	}
 	else if (cmd == 'C') {  // cursor forward  CUF
-		x += evaluate_n(par1);
+		int n = evaluate_n(par1);
+		x += n;
+		DLD("CSI C (%d)", n);
 
 		if (x >= w) {
 			dolog(ll_info, "%c: x=%d", cmd, x);
@@ -497,7 +504,9 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'D') {  // cursor backward  CUB
-		x -= evaluate_n(par1);
+		int n = evaluate_n(par1);
+		x -= n;
+		DLD("CSI D (%d)", n);
 
 		if (x < 0) {
 			dolog(ll_info, "%c: x=%d", cmd, x);
@@ -505,7 +514,9 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'd') {  // set y(?)
-		y = par1.has_value() ? par1.value() - 1 : 0;
+		int n = par1.has_value() ? par1.value() - 1 : 0;
+		y = n;
+		DLD("CSI d (%d)", n);
 
 		if (y < 0) {
 			dolog(ll_info, "%c: y=%d", cmd, y);
@@ -517,10 +528,14 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'E') {  // Move cursor to the beginning of the line n lines down
-		do_next_line(true, false, evaluate_n(par1));
+		int n = evaluate_n(par1);
+		DLD("CSI E (%d)", n);
+		do_next_line(true, false, n);
 	}
 	else if (cmd == 'G') {  // cursor horizontal absolute
-		x = par1.has_value() ? par1.value() - 1 : 0;
+		int n = par1.has_value() ? par1.value() - 1 : 0;
+		DLD("CSI G (%d)", n);
+		x = n;
 
 		if (x < 0) {
 			dolog(ll_info, "%c: x=%d", cmd, x);
@@ -532,6 +547,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'H' || cmd == 'f') {  // set position  CUP
+		DLD("CSI H (%d,%d)", par1.has_value() ? par1.value() : 1, par2.has_value() ? par2.value() : 1);
+
 		y = par1.has_value() ? par1.value() - 1 : 0;
 
 		if (y < 0) {
@@ -556,6 +573,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	}
 	else if (cmd == 'J') {
 		int val = par1.has_value() ? par1.value() : 0;
+
+		DLD("CSI J (%d)", val);
 
 		int start_pos = 0;
 		int end_pos   = y * w + x;
@@ -585,6 +604,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'K') {
 		int val = par1.has_value() ? par1.value() : 0;
 
+		DLD("CSI K (%d)", val);
+
 		int start_x = 0;
 		int end_x   = w;
 
@@ -605,12 +626,16 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'L') {  // insert lines
 		int n = evaluate_n(par1);
 
+		DLD("CSI L (%d)", n);
+
 		for(int i=0; i<n; i++)
 			insert_line(y);
 
 		x = 0;
 	}
 	else if (cmd == 'h') {
+		DLD("CSI h (%s)", parameters.c_str());
+
 		if (parameters == "?7")
 			wraparound = true;
 		else if (parameters == "?3")  // DECCOLM
@@ -621,6 +646,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
 	else if (cmd == 'l') {
+		DLD("CSI l (%s)", parameters.c_str());
+
 		if (parameters == "?7")
 			wraparound = false;
 		else if (parameters == "?3")  // DECCOLM
@@ -633,12 +660,16 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
 
+		DLD("CSI M (%d)", n);
+
 		for(int i=0; i<n; i++)
 			delete_line(y);
 
 		x = 0;
 	}
 	else if (cmd == 'm') {
+		DLD("CSI m (%s)", parameters.c_str());
+
 		if (pars.empty())
 			fg_col_ansi = 7, bg_col_ansi = 0, attr = 0;
 		else {
@@ -747,6 +778,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'n') {  // device status report (DSR)
+		DLD("CSI n (%d)", par1);
+
 		if (par1 == 5)  // status report
 			send_back = "\033[0n";  // OK
 		else if (par1 == 6)  // report cursor position (CPR) [row;column]
@@ -756,10 +789,14 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'c') {  // "what are you"
+		DLD("CSI c");
+
 		send_back = "\033[?1;0c";
 	}
 	else if (cmd == 'X') {  // erase character
 		int offset = y * w + x;
+
+		DLD("CSI X (%d)", par1);
 
 		if (par1 == 0)
 			par1 = 1;
@@ -774,24 +811,33 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'Y') {  // vertical tab, CVT
+		DLD("CSI Y (%d)", par1);
+
 		while(y < h && v_tab_stops.at(y) == false)
 			y++;
 	}
 	else if (cmd == 'P') {  // delete character
 		int n = evaluate_n(par1);
 
+		DLD("CSI P (%d)", n);
+
 		delete_character(n);
 	}
 	else if (cmd == '@') {  // insert character
 		int n = evaluate_n(par1);
 
+		DLD("CSI n (%d)", n);
+
 		insert_character(n);
 	}
 	else if (cmd == ']') {  // "operating system command", terminated with ST (ESC \)
+		DLD("CSI ] (OSC)");
 		OSC = true;
 	}
 	else if (cmd == 'g') {  // tabulation clear, TBC
 		if (par1.has_value()) {
+			DLD("CSI g (%d)", par1);
+
 			if (par1.value() == 0)  // the character tabulation stop at the active presentation position is cleared
 				h_tab_stops.at(x) = false;
 			else if (par1.value() == 1)  // the line tabulation stop at the active line is cleared
@@ -806,10 +852,14 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			}
 		}
 		else {
+			DLD("CSI g");
+
 			h_tab_stops.at(x) = false;
 		}
 	}
 	else {
+		DLD("CSI %c (???)", cmd);
+
 		dolog(ll_info, "Escape ^[[ %s %c not supported", parameters.c_str(), cmd);
 
 		send_back = myformat("%c", cmd);
@@ -824,11 +874,17 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 
 	for(size_t i=0; i<len; i++) {
 		// C0
-		if (in[i] == 13)  // carriage return
+		if (in[i] == 13) {  // carriage return
+			DLD("CR");
 			x = 0, utf8_len = 0;
-		else if (in[i] == 10)  // new line
+		}
+		else if (in[i] == 10) {  // new line
+			DLD("NL");
 			y++, utf8_len = 0;
+		}
 		else if (in[i] == 8) {  // backspace
+			DLD("backspace");
+
 			if (x)
 				x--;
 			else if (y)
@@ -837,12 +893,16 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			utf8_len = 0;
 		}
 		else if (in[i] == 9) {  // tab
+			DLD("TAB");
+
 			while(x < w && h_tab_stops.at(x) == false)
 				x++;
 
 			utf8_len = 0;
 		}
 		else if (in[i] == 11) {  // ^K, vtab
+			DLD("VTAB");
+
 			while(y < h) {
 				y++;
 
@@ -861,25 +921,36 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			}
 			else if (escape_type == ET_NONE) {
 				if (in[i] == 'D' || in[i] == 'E') {  // IND index / NEL next line
+					DLD("ESC %c", in[i]);
 					do_next_line(in[i] == 'E', true, 1);  // x=0 and scroll, 1 line
 				}
 				else if (in[i] == 'M') {  // RI, reverse index
+					DLD("ESC M");
 					do_prev_line(false, true, 1);
 				}
-				else if (in[i] == 'P')  // DCS, terminated by ST
+				else if (in[i] == 'P') {  // DCS, terminated by ST
+					DLD("ESC P");
 					escape_type = ET_DCS;
+				}
 				else if (in[i] == '[')  // constrol sequence introduceer, "Starts most of the useful sequences, terminated by a byte in the range 0x40 through 0x7E"
 					escape_type = ET_CSI;
 				else if (in[i] == '\\') { // ST
+					DLD("ESC \\");
 					escape_type = ET_NONE;
 					escape = false;
 				}
-				else if (in[i] == ']')  // OSC
+				else if (in[i] == ']') {  // OSC
+					DLD("ESC ]");
 					escape_type = ET_OSC;
-				else if (in[i] == 'H')  // HTS, horizontal tab set
+				}
+				else if (in[i] == 'H') {  // HTS, horizontal tab set
+					DLD("HTS");
 					h_tab_stops.at(x) = true;
-				else if (in[i] == 'J')  // VTS, vertical tab set
+				}
+				else if (in[i] == 'J') {  // VTS, vertical tab set
+					DLD("VTS");
 					v_tab_stops.at(y) = true;
+				}
 				else {
 					emit_character(in[i]);
 
@@ -937,8 +1008,11 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				c = in[i];
 			}
 
-			if (c != uint32_t(-1))
+			if (c != uint32_t(-1)) {
+				DLD("CHAR: %c", c);
+
 				emit_character(c);
+			}
 		}
 
 		if (y == h) {
