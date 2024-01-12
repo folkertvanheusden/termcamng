@@ -19,6 +19,7 @@ required
  * libyaml-cpp-dev
  * libturbojpeg0-dev
  * libfreetype-dev
+ * libwolfssl-dev
 
 In the example yaml-file (configuration-file) the fonts from the
 debian fonts-unifont and fonts-wine packages are used.
