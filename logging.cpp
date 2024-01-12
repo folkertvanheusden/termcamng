@@ -18,7 +18,6 @@
 const char  *logfile = strdup("termcamng.log");
 log_level_t  log_level_file   = ll_warning;
 log_level_t  log_level_screen = ll_warning;
-static FILE *lfh = nullptr;
 static int   lf_uid = 0;
 static int   lf_gid = 0;
 static bool  ug_id_changed = false;
@@ -77,7 +76,7 @@ void setloguid(const int uid, const int gid)
 
 void DOLOG(const log_level_t ll, const char *fmt, ...)
 {
-	lfh = fopen(logfile, "a+");
+	FILE *lfh = fopen(logfile, "a+");
 	if (!lfh) {
 		fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
 		exit(1);

@@ -1,10 +1,13 @@
-// (C) 2017-2022 by folkert van heusden, released under Apache License v2.0
+// (C) 2017-2024 by folkert van heusden, released under Apache License v2.0
 #include <mutex>
 #include <string>
 #include <fontconfig/fontconfig.h>
+#include <freetype/ftglyph.h>
 
 #include "error.h"
 #include "font.h"
+#include "logging.h"
+
 
 FT_Library font::library;
 
@@ -35,7 +38,7 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
 	for(UChar32 c = 32; c < 127; c++) {
-		int glyph_index   = FT_Get_Char_Index(faces.at(0), c);
+		int glyph_index = FT_Get_Char_Index(faces.at(0), c);
 
 		if (FT_Load_Glyph(faces.at(0), glyph_index, 0) == 0) {
 			font_width   = std::max(font_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);
@@ -55,16 +58,22 @@ font::~font()
 	FT_Done_FreeType(font::library);
 }
 
+int font::get_intensity_multiplier(const intensity_t i)
+{
+	if (i == intensity_t::I_DIM)
+		return 145;
+
+	if (i == intensity_t::I_BOLD)
+		return 255;
+
+	return 200;
+}
+
 void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	const int bytes = dest_width * dest_height * 3;
 
-	uint8_t max = 200;
-
-	if (intensity == intensity_t::I_DIM)
-		max = 145;
-	else if (intensity == intensity_t::I_BOLD)
-		max = 255;
+	uint8_t max = get_intensity_multiplier(intensity);
 
 	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
 		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
@@ -191,7 +200,7 @@ int font::get_height() const
 	return font_height;
 }
 
-bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
+bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	std::vector<FT_Encoding> encodings { ft_encoding_symbol, ft_encoding_unicode };
 
@@ -204,32 +213,51 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			if (glyph_index == 0 && face < faces.size() - 1)
 				continue;
 
-			if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_RENDER))
+			if (FT_Load_Glyph(faces.at(face), glyph_index, 0))
 				continue;
 
 			// draw background
+			uint8_t max = get_intensity_multiplier(intensity);
+			uint8_t bg_r = invert ? fg.r * max / 255 : bg.r * max / 255;
+			uint8_t bg_g = invert ? fg.g * max / 255 : bg.g * max / 255;
+			uint8_t bg_b = invert ? fg.b * max / 255 : bg.b * max / 255;
+
 			for(int cy=0; cy<output_height; cy++) {
 				int offset_y = (y + cy) * dest_width * 3;
 
 				for(int cx=0; cx<font_width; cx++) {
 					int offset = offset_y + (x + cx) * 3;
 
-					dest[offset + 0] = bg.r;
-					dest[offset + 1] = bg.g;
-					dest[offset + 2] = bg.b;
+					dest[offset + 0] = bg_r;
+					dest[offset + 1] = bg_g;
+					dest[offset + 2] = bg_b;
 				}
 			}
 
-			FT_GlyphSlot slot   = faces.at(face)->glyph;
-
+			FT_GlyphSlot slot = faces.at(face)->glyph;
 			if (!slot)
 				continue;
+			FT_Glyph glyph { };
+			FT_Get_Glyph(slot, &glyph);
+
+			if (italic) {
+				FT_Matrix matrix { };
+				matrix.xx = 0x10000;
+				matrix.xy = 0x5000;
+				matrix.yx = 0;
+				matrix.yy = 0x10000;
+				if (FT_Glyph_Transform(glyph, &matrix, nullptr))
+					dolog(ll_info, "transform error");
+			}
+
+			FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, true);
 
 			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
-
 			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
 
-			draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+			draw_glyph_bitmap(&reinterpret_cast<FT_BitmapGlyph>(glyph)->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+
+			FT_Done_Glyph(glyph);
 
 			return true;
 		}

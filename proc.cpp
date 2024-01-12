@@ -53,10 +53,8 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 			(void)open("/dev/null", O_WRONLY);
 		}
 
-		// TODO: a smarter way?
 		int fd_max = sysconf(_SC_OPEN_MAX);
-		for(int fd=3; fd<fd_max; fd++)
-			close(fd);
+		close_range(3, fd_max, CLOSE_RANGE_CLOEXEC);
 
 		do {
 			pid_t child_pid = fork();

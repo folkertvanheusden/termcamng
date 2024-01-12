@@ -1,4 +1,4 @@
-// (C) 2017-2022 by folkert van heusden, released under Apache License v2.0
+// (C) 2017-2024 by folkert van heusden, released under Apache License v2.0
 #pragma once
 
 #include <map>
@@ -34,6 +34,8 @@ protected:
 	int                  max_ascender { 0 };
 	std::vector<FT_Face> faces;
 
+	int get_intensity_multiplier(const intensity_t i);
+
 	std::optional<std::tuple<int, int, int, int> > find_text_dimensions(const UChar32 c);
 
 	void draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int output_height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height);
@@ -45,5 +47,5 @@ public:
 	int  get_width() const;
 	int  get_height() const;
 
-	bool draw_glyph(const UChar32 utf_character, const int height, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height);
+	bool draw_glyph(const UChar32 utf_character, const int height, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height);
 };

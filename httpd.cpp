@@ -12,7 +12,7 @@
 #include "io.h"
 #include "logging.h"
 #include "net.h"
-#include "net-io-bearssl.h"
+#include "net-io-wolfssl.h"
 #include "net-io-fd.h"
 #include "str.h"
 #include "time.h"
@@ -135,7 +135,7 @@ void httpd::operator()()
 				net_io *io = nullptr;
 
 				if (tls_key_certificate.has_value())
-					io = new net_io_bearssl(client_fd, tls_key_certificate->first, tls_key_certificate->second);
+					io = new net_io_wolfssl(client_fd, tls_key_certificate->first, tls_key_certificate->second);
 				else
 					io = new net_io_fd(client_fd);
 

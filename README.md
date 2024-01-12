@@ -19,6 +19,7 @@ required
  * libyaml-cpp-dev
  * libturbojpeg0-dev
  * libfreetype-dev
+ * libwolfssl-dev
 
 In the example yaml-file (configuration-file) the fonts from the
 debian fonts-unifont and fonts-wine packages are used.
@@ -59,7 +60,7 @@ http://vps001.vanheusden.com:8888/stream.mjpeg
 
 or via https:
 
-https://vps001.vanheusden.com:4433/stream.mjpeg
+https://vps001.vanheusden.com:4430/stream.mjpeg
 
 Note: it works fine with the chrome browser on Linux. Current (Feb.
 2022) Firefox browsers sometimes show only a partial part of the

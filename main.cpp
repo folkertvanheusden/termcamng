@@ -18,6 +18,8 @@
 #include <security/pam_misc.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <wolfssl/options.h>
+#include <wolfssl/ssl.h>
 
 #include "error.h"
 #include "http.h"
@@ -202,7 +204,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 				if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
 					const char *requested_user = ssh_message_auth_user(message);
 
-					auto auth_rc =  authenticate_against_pam(requested_user, ssh_message_auth_password(message));
+					auto auth_rc = authenticate_against_pam(requested_user, ssh_message_auth_password(message));
 
 					if (auth_rc.first) {
 						auth_success = true;
@@ -550,12 +552,24 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 	}
 }
 
+void wolfssl_logging_cb(const int level, const char *const msg)
+{
+	dolog(ll_debug, "%d] %s", level, msg);
+}
+
 int main(int argc, char *argv[])
 {
 	std::string cfg_file          = argc == 2 ? argv[1] : "termcamng.yaml";
 
 	if (argc == 2)
 		cfg_file = argv[1];
+
+#ifndef NDEBUG
+	wolfSSL_SetLoggingCb(wolfssl_logging_cb);
+        wolfSSL_Debugging_ON();
+#endif
+
+        wolfSSL_Init();
 
 	try {
 		YAML::Node config             = YAML::LoadFile(cfg_file);
@@ -690,6 +704,8 @@ int main(int argc, char *argv[])
 		while(!stop)
 			sleep(1);
 
+		dolog(ll_info, "Stopping...");
+
 		ssh_thread_handle.join();
 
 		telnet_thread_handle.join();
@@ -700,6 +716,8 @@ int main(int argc, char *argv[])
 			stop_http_server(s_h);
 
 		stop_http_server(h);
+
+		wolfSSL_Cleanup();
 	}
 	catch(const std::string & exception) {
 		error_exit(true, "Program failure: %s", exception.c_str());
