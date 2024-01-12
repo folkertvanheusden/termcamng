@@ -1,4 +1,4 @@
-// (C) 2017-2022 by folkert van heusden, released under Apache License v2.0
+// (C) 2017-2024 by folkert van heusden, released under Apache License v2.0
 #pragma once
 
 #include <map>
