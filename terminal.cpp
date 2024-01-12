@@ -1051,7 +1051,13 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			// TODO: italic (A_ITALIC)
 
 			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, fg, bg, x, y, *out, *out_w, *out_h)) {
-				// TODO
+				for(int cy=y; cy<y + char_h; cy++) {
+					for(int cx=x; cx<x + char_w; cx++) {
+						(*out)[cy * *out_w * 3 + cx * 3 + 0] = rand();
+						(*out)[cy * *out_w * 3 + cx * 3 + 1] = rand();
+						(*out)[cy * *out_w * 3 + cx * 3 + 2] = rand();
+					}
+				}
 			}
 		}
 	}

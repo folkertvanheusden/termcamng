@@ -202,7 +202,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 				if (ssh_message_type(message) == SSH_REQUEST_AUTH && ssh_message_subtype(message) == SSH_AUTH_METHOD_PASSWORD) {
 					const char *requested_user = ssh_message_auth_user(message);
 
-					auto auth_rc =  authenticate_against_pam(requested_user, ssh_message_auth_password(message));
+					auto auth_rc = authenticate_against_pam(requested_user, ssh_message_auth_password(message));
 
 					if (auth_rc.first) {
 						auth_success = true;
