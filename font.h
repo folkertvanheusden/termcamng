@@ -45,5 +45,5 @@ public:
 	int  get_width() const;
 	int  get_height() const;
 
-	bool draw_glyph(const UChar32 utf_character, const int height, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height);
+	bool draw_glyph(const UChar32 utf_character, const int height, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height);
 };

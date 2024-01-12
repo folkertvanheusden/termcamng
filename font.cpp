@@ -1,10 +1,12 @@
-// (C) 2017-2022 by folkert van heusden, released under Apache License v2.0
+// (C) 2017-2024 by folkert van heusden, released under Apache License v2.0
 #include <mutex>
 #include <string>
 #include <fontconfig/fontconfig.h>
+#include <freetype/ftglyph.h>
 
 #include "error.h"
 #include "font.h"
+
 
 FT_Library font::library;
 
@@ -35,7 +37,7 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
 	for(UChar32 c = 32; c < 127; c++) {
-		int glyph_index   = FT_Get_Char_Index(faces.at(0), c);
+		int glyph_index = FT_Get_Char_Index(faces.at(0), c);
 
 		if (FT_Load_Glyph(faces.at(0), glyph_index, 0) == 0) {
 			font_width   = std::max(font_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);
@@ -191,7 +193,7 @@ int font::get_height() const
 	return font_height;
 }
 
-bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
+bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	std::vector<FT_Encoding> encodings { ft_encoding_symbol, ft_encoding_unicode };
 
@@ -220,16 +222,27 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 				}
 			}
 
-			FT_GlyphSlot slot   = faces.at(face)->glyph;
-
+			FT_GlyphSlot slot = faces.at(face)->glyph;
 			if (!slot)
 				continue;
+			FT_Glyph glyph { };
+			FT_Get_Glyph(slot, &glyph);
+
+			if (italic) {
+				FT_Matrix matrix { };
+				matrix.xx = 0x10000;
+				matrix.xy = 0x5000;
+				matrix.yx = 0;
+				matrix.yy = 0x10000;
+				FT_Glyph_Transform(glyph, &matrix, nullptr);
+			}
 
 			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
-
 			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
 
-			draw_glyph_bitmap(&slot->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+			draw_glyph_bitmap(&reinterpret_cast<FT_BitmapGlyph>(glyph)->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+
+			FT_Done_Glyph(glyph);
 
 			return true;
 		}

@@ -1032,15 +1032,13 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 				bg   = color_map[0][bg_color];
 
 			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
-
 			bool     blink        = !!(screen[offset].attr & A_BLINK);
+			bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
+			bool     underline    = !!(screen[offset].attr & A_UNDERLINE);
+			bool     italic       = !!(screen[offset].attr & A_ITALIC);
 
 			if (blink)
 				inverse = blink_state;
-
-			bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
-
-			bool     underline    = !!(screen[offset].attr & A_UNDERLINE);
 
 			int     x            = cx * char_w;
 			int     y            = cy * char_h;
@@ -1048,9 +1046,7 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			if (global_invert)
 				std::swap(fg, bg);
 
-			// TODO: italic (A_ITALIC)
-
-			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, fg, bg, x, y, *out, *out_w, *out_h)) {
+			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, italic, fg, bg, x, y, *out, *out_w, *out_h)) {
 				for(int cy=y; cy<y + char_h; cy++) {
 					for(int cx=x; cx<x + char_w; cx++) {
 						(*out)[cy * *out_w * 3 + cx * 3 + 0] = rand();
