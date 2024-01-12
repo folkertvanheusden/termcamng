@@ -250,7 +250,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 					dolog(ll_info, "transform error");
 			}
 
-			FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, false);
+			FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, true);
 
 			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
 			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
