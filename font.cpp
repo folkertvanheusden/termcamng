@@ -6,6 +6,7 @@
 
 #include "error.h"
 #include "font.h"
+#include "logging.h"
 
 
 FT_Library font::library;
@@ -212,7 +213,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			if (glyph_index == 0 && face < faces.size() - 1)
 				continue;
 
-			if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_RENDER))
+			if (FT_Load_Glyph(faces.at(face), glyph_index, 0))
 				continue;
 
 			// draw background
@@ -245,8 +246,11 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 				matrix.xy = 0x5000;
 				matrix.yx = 0;
 				matrix.yy = 0x10000;
-				FT_Glyph_Transform(glyph, &matrix, nullptr);
+				if (FT_Glyph_Transform(glyph, &matrix, nullptr))
+					dolog(ll_info, "transform error");
 			}
+
+			FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, false);
 
 			int          draw_x = x + font_width / 2 - slot->metrics.width / 128;
 			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
