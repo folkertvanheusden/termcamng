@@ -690,6 +690,8 @@ int main(int argc, char *argv[])
 		while(!stop)
 			sleep(1);
 
+		dolog(ll_info, "Stopping...");
+
 		ssh_thread_handle.join();
 
 		telnet_thread_handle.join();
