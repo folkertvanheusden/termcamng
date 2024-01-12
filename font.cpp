@@ -57,16 +57,22 @@ font::~font()
 	FT_Done_FreeType(font::library);
 }
 
+int font::get_intensity_multiplier(const intensity_t i)
+{
+	if (i == intensity_t::I_DIM)
+		return 145;
+
+	if (i == intensity_t::I_BOLD)
+		return 255;
+
+	return 200;
+}
+
 void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	const int bytes = dest_width * dest_height * 3;
 
-	uint8_t max = 200;
-
-	if (intensity == intensity_t::I_DIM)
-		max = 145;
-	else if (intensity == intensity_t::I_BOLD)
-		max = 255;
+	uint8_t max = get_intensity_multiplier(intensity);
 
 	if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
 		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
@@ -210,15 +216,20 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 				continue;
 
 			// draw background
+			uint8_t max = get_intensity_multiplier(intensity);
+			uint8_t bg_r = invert ? fg.r * max / 255 : bg.r * max / 255;
+			uint8_t bg_g = invert ? fg.g * max / 255 : bg.g * max / 255;
+			uint8_t bg_b = invert ? fg.b * max / 255 : bg.b * max / 255;
+
 			for(int cy=0; cy<output_height; cy++) {
 				int offset_y = (y + cy) * dest_width * 3;
 
 				for(int cx=0; cx<font_width; cx++) {
 					int offset = offset_y + (x + cx) * 3;
 
-					dest[offset + 0] = bg.r;
-					dest[offset + 1] = bg.g;
-					dest[offset + 2] = bg.b;
+					dest[offset + 0] = bg_r;
+					dest[offset + 1] = bg_g;
+					dest[offset + 2] = bg_b;
 				}
 			}
 

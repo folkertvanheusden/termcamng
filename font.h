@@ -34,6 +34,8 @@ protected:
 	int                  max_ascender { 0 };
 	std::vector<FT_Face> faces;
 
+	int get_intensity_multiplier(const intensity_t i);
+
 	std::optional<std::tuple<int, int, int, int> > find_text_dimensions(const UChar32 c);
 
 	void draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int output_height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height);
