@@ -15,7 +15,6 @@ set(CMAKE_BUILD_TYPE Debug)
 add_compile_options(-Wall -pedantic)
 
 add_executable(termcamng
-	BearSSLHelpers.cpp
 	error.cpp
 	font.cpp
 	http.cpp
@@ -25,8 +24,8 @@ add_executable(termcamng
 	main.cpp
 	net.cpp
 	net-io.cpp
-	net-io-bearssl.cpp
 	net-io-fd.cpp
+	net-io-wolfssl.cpp
 	picio.cpp
 	proc.cpp
 	str.cpp
@@ -35,8 +34,6 @@ add_executable(termcamng
 	utils.cpp
 	yaml-helpers.cpp
 	)
-
-target_link_libraries(termcamng -lbearssl)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
@@ -74,6 +71,11 @@ pkg_check_modules(LIBJPEG REQUIRED libturbojpeg)
 target_link_libraries(termcamng ${LIBJPEG_LIBRARIES})
 target_include_directories(termcamng PUBLIC ${LIBJPEG_INCLUDE_DIRS})
 target_compile_options(termcamng PUBLIC ${LIBJPEG_CFLAGS_OTHER})
+
+pkg_check_modules(WOLFSSL REQUIRED wolfssl)
+target_link_libraries(termcamng ${WOLFSSL_LIBRARIES})
+target_include_directories(termcamng PUBLIC ${WOLFSSL_INCLUDE_DIRS})
+target_compile_options(termcamng PUBLIC ${WOLFSSL_CFLAGS_OTHER})
 
 CHECK_INCLUDE_FILE(security/pam_appl.h LIBPAM)
 if (LIBPAM)

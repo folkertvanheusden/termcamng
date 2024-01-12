@@ -18,6 +18,8 @@
 #include <security/pam_misc.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <wolfssl/options.h>
+#include <wolfssl/ssl.h>
 
 #include "error.h"
 #include "http.h"
@@ -550,12 +552,24 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 	}
 }
 
+void wolfssl_logging_cb(const int level, const char *const msg)
+{
+	dolog(ll_debug, "%d] %s", level, msg);
+}
+
 int main(int argc, char *argv[])
 {
 	std::string cfg_file          = argc == 2 ? argv[1] : "termcamng.yaml";
 
 	if (argc == 2)
 		cfg_file = argv[1];
+
+#ifndef NDEBUG
+	wolfSSL_SetLoggingCb(wolfssl_logging_cb);
+        wolfSSL_Debugging_ON();
+#endif
+
+        wolfSSL_Init();
 
 	try {
 		YAML::Node config             = YAML::LoadFile(cfg_file);
@@ -700,6 +714,8 @@ int main(int argc, char *argv[])
 			stop_http_server(s_h);
 
 		stop_http_server(h);
+
+		wolfSSL_Cleanup();
 	}
 	catch(const std::string & exception) {
 		error_exit(true, "Program failure: %s", exception.c_str());
