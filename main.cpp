@@ -389,7 +389,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 		lck.unlock();
 
-		if (dumb_refresh && dumb_telnet) {
+		if (client_fd != -1 && dumb_refresh && dumb_telnet) {
 			std::string data = generate_initial_screen(t);
 
 			if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
