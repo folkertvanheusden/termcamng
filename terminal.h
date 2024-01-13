@@ -21,6 +21,14 @@
 
 typedef enum { ET_NONE, ET_DCS, ET_CSI, ET_ST, ET_OSC } escape_type_t;
 
+#define DLD(...)  do {                                    \
+		std::string prefix = myformat("x: %03d, y: %02d, wrap: %d | ", x, y, wraparound); \
+		std::string temp = myformat(__VA_ARGS__); \
+                                                          \
+		dolog(ll_debug, (prefix + temp).c_str()); \
+	}                                                 \
+	while(0);
+
 typedef struct {
 	uint32_t c;
 	int      fg_col_ansi;
