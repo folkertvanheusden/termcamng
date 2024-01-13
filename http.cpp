@@ -168,7 +168,7 @@ void get_stream(const std::string url, net_io *const io, const void *const param
 		stream_frames(io, hsp, sct, stop_flag);
 }
 
-httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp, const std::optional<std::pair<std::string, std::string> > tls_key_certificate)
+httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp, const std::optional<std::pair<std::string, std::string> > & tls_key_certificate)
 {
 	std::map<std::string, std::function<void (const std::string url, net_io *const io, const void *, std::atomic_bool & stop_flag)> > url_map;
 

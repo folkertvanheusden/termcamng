@@ -559,19 +559,19 @@ void wolfssl_logging_cb(const int level, const char *const msg)
 
 int main(int argc, char *argv[])
 {
-	std::string cfg_file          = argc == 2 ? argv[1] : "termcamng.yaml";
+	try {
+		std::string cfg_file          = argc == 2 ? argv[1] : "termcamng.yaml";
 
-	if (argc == 2)
-		cfg_file = argv[1];
+		if (argc == 2)
+			cfg_file = argv[1];
 
 #ifndef NDEBUG
-	wolfSSL_SetLoggingCb(wolfssl_logging_cb);
-        wolfSSL_Debugging_ON();
+		wolfSSL_SetLoggingCb(wolfssl_logging_cb);
+		wolfSSL_Debugging_ON();
 #endif
 
-        wolfSSL_Init();
+		wolfSSL_Init();
 
-	try {
 		YAML::Node config             = YAML::LoadFile(cfg_file);
 
 		const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
