@@ -112,5 +112,5 @@ public:
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
 
-	void render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h);
+	bool render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h, const bool force);
 };

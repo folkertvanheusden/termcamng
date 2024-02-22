@@ -10,8 +10,6 @@
 #include "picio.h"
 
 
-thread_local myjpeg my_jpeg;
-
 static void libpng_error_handler(png_structp png, png_const_charp msg)
 {
 	error_exit(false, "libpng error: %s", msg);
@@ -65,6 +63,20 @@ void write_PNG_file(FILE *const fh, const int ncols, const int nrows, const int 
 	free(row_pointers);
 }
 
+class myjpeg
+{
+private:
+       tjhandle jpegCompressor;
+
+public:
+       myjpeg();
+       virtual ~myjpeg();
+
+       bool write_JPEG_memory(const int ncols, const int nrows, const int compression_level, const uint8_t *const pixels, uint8_t **out, size_t *out_len);
+};
+
+thread_local myjpeg my_jpeg;
+
 myjpeg::myjpeg()
 {
 	jpegCompressor = tjInitCompress();
@@ -89,7 +101,19 @@ bool myjpeg::write_JPEG_memory(const int ncols, const int nrows, const int compr
 	return true;
 }
 
-void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+void write_png(const int ncols, const int nrows, const int compression_level, const uint8_t *const in, uint8_t **const out, size_t *const out_len)
+{
+	FILE *fh = open_memstream(reinterpret_cast<char **>(out), out_len);
+	write_PNG_file(fh, ncols, nrows, compression_level, const_cast<uint8_t *>(in));
+	fclose(fh);
+}
+
+void write_jpg(const int ncols, const int nrows, const int compression_level, const uint8_t *const in, uint8_t **const out, size_t *const out_len)
+{
+	my_jpeg.write_JPEG_memory(ncols, nrows, compression_level, in, out, out_len);
+}
+
+void write_bmp(const int ncols, const int nrows, const int compression_level, const uint8_t *const in, uint8_t **const out, size_t *const out_len)
 {
 	*out_len = ncols * nrows * 3 + 2 + 12 + 40;
 	*out = new uint8_t[*out_len];
@@ -152,7 +176,6 @@ void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_
 	(*out)[offset++] = 0x00;
 	assert(offset == 40 + 12 + 2);
 
-	size_t n_pixels = ncols * nrows;
 	for(int y=nrows - 1; y >= 0; y--) {
 		size_t in_o = y * ncols * 3;
 		for(int x=0; x<ncols; x++) {
@@ -164,7 +187,7 @@ void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_
 	}
 }
 
-void write_tga(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+void write_tga(const int ncols, const int nrows, const int compression_level, const uint8_t *const in, uint8_t **const out, size_t *const out_len)
 {
 	*out_len = ncols * nrows * 3 + 18;
 	*out = new uint8_t[*out_len];
@@ -191,7 +214,7 @@ void write_tga(const int ncols, const int nrows, const uint8_t *const in, uint8_
 	}
 }
 
-void write_simple(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+void write_simple(const int ncols, const int nrows, const int compression_level, const uint8_t *const in, uint8_t **const out, size_t *const out_len)
 {
 	*out_len = ncols * nrows * 3 + 4;
 	*out = new uint8_t[*out_len];
