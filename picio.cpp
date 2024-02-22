@@ -1,6 +1,8 @@
+#include <assert.h>
 #include <png.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <turbojpeg.h>
 
 #include "error.h"
@@ -85,4 +87,79 @@ bool myjpeg::write_JPEG_memory(const int ncols, const int nrows, const int compr
 	*out_len = len;
 
 	return true;
+}
+
+void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+{
+	*out_len = ncols * nrows * 3 + 2 + 12 + 40;
+	*out = new uint8_t[*out_len];
+
+	size_t offset = 0;
+	(*out)[offset++] = 'B';
+	(*out)[offset++] = 'M';
+	(*out)[offset++] = *out_len;  // file size in bytes
+	(*out)[offset++] = *out_len >> 8;
+	(*out)[offset++] = *out_len >> 16;
+	(*out)[offset++] = *out_len >> 24;
+	(*out)[offset++] = 0x00;  // reserved
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 54;  // offset of start (2 + 12 + 40)
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	assert(offset == 0x0e);
+	(*out)[offset++] = 40;  // header size
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = ncols;
+	(*out)[offset++] = ncols >> 8;
+	(*out)[offset++] = ncols >> 16;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = nrows;
+	(*out)[offset++] = nrows >> 8;
+	(*out)[offset++] = nrows >> 16;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x01;  // color planes
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 24;  // bits per pixel
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;  // compression method
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;  // image size
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = ncols;
+	(*out)[offset++] = ncols >> 8;
+	(*out)[offset++] = ncols >> 16;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = nrows;
+	(*out)[offset++] = nrows >> 8;
+	(*out)[offset++] = nrows >> 16;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;  // color count
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;  // important colors
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	(*out)[offset++] = 0x00;
+	assert(offset == 40 + 12 + 2);
+
+	size_t n_pixels = ncols * nrows;
+	for(int y=nrows - 1; y >= 0; y--) {
+		size_t in_o = y * ncols * 3;
+		for(int x=0; x<ncols; x++) {
+			size_t in_o2 = in_o + x * 3;
+			(*out)[offset++] = in[in_o2 + 2];
+			(*out)[offset++] = in[in_o2 + 1];
+			(*out)[offset++] = in[in_o2 + 0];
+		}
+	}
 }
