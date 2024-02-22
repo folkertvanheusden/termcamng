@@ -68,6 +68,9 @@ private:
 	std::vector<bool> v_tab_stops;
 	bool              global_invert    { false };  // DECSNM
 	bool		  smooth_scrolling { false };  // DECSCLM
+	uint8_t          *frame_cache { nullptr };
+	std::mutex        frame_cache_lock;
+	bool              do_render   { false };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;

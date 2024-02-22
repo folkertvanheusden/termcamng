@@ -302,12 +302,18 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 
 terminal::~terminal()
 {
+	free(frame_cache);
+
 	delete [] screen;
 }
 
 void terminal::resize_width(const int new_w)
 {
 	delete [] screen;
+
+	std::unique_lock<std::mutex> lck(frame_cache_lock);
+	free(frame_cache);
+	frame_cache = nullptr;
 
 	w = new_w;
 
@@ -1028,6 +1034,9 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 
 	cond.notify_all();
 
+	std::unique_lock<std::mutex> f_lck(frame_cache_lock);
+	do_render = true;
+
 	return send_back;
 }
 
@@ -1055,8 +1064,6 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			cond.wait_for(lck, std::chrono::milliseconds(wait_for_delay));
 	}
 
-	*ts_after = latest_update;
-
 	if (start_wait - blink_switch_ts >= 60000 / 150) {
 		blink_state     = !blink_state;
 		blink_switch_ts = latest_update;
@@ -1067,69 +1074,85 @@ void terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 
 	int pixels_per_row  = w * char_w;
 
-	*out = reinterpret_cast<uint8_t *>(calloc(1, w * char_w * h * char_h * 3));
+	size_t n_bytes = w * char_w * h * char_h * 3;
+	*out = reinterpret_cast<uint8_t *>(calloc(1, n_bytes));
 
 	*out_w = pixels_per_row;
 	*out_h = h * char_h;
 
-	for(int cy=0; cy<h; cy++) {
-		for(int cx=0; cx<w; cx++) {
-			int      offset       = cy * w + cx;
-			uint32_t c            = screen[offset].c;
+	std::unique_lock<std::mutex> f_lck(frame_cache_lock);
 
-			int      bold         = !!(screen[offset].attr & A_BOLD);
-			int      dim          = !!(screen[offset].attr & A_DIM);
+	if (do_render == false && frame_cache != nullptr) {
+		memcpy(*out, frame_cache, n_bytes);
+	}
+	else {
+		do_render = false;
+		*ts_after = latest_update;
 
-			font::intensity_t intensity = font::intensity_t::I_NORMAL;
+		for(int cy=0; cy<h; cy++) {
+			for(int cx=0; cx<w; cx++) {
+				int      offset       = cy * w + cx;
+				uint32_t c            = screen[offset].c;
 
-			if (bold && !dim)
-				intensity = font::intensity_t::I_BOLD;
-			else if (dim)
-				intensity = font::intensity_t::I_DIM;
+				int      bold         = !!(screen[offset].attr & A_BOLD);
+				int      dim          = !!(screen[offset].attr & A_DIM);
 
-			int      fg_color     = screen[offset].fg_col_ansi;
-			int      bg_color     = screen[offset].bg_col_ansi;
+				font::intensity_t intensity = font::intensity_t::I_NORMAL;
 
-			if (fg_color == bg_color && fg_color != -1)
-				fg_color = 7, bg_color = 0;
+				if (bold && !dim)
+					intensity = font::intensity_t::I_BOLD;
+				else if (dim)
+					intensity = font::intensity_t::I_DIM;
 
-			rgb_t    fg;
-			if (fg_color == -1)
-				fg   = screen[offset].fg_rgb;
-			else
-				fg   = color_map[bold][fg_color];
+				int      fg_color     = screen[offset].fg_col_ansi;
+				int      bg_color     = screen[offset].bg_col_ansi;
 
-			rgb_t    bg;
-			if (bg_color == -1)
-				bg   = screen[offset].bg_rgb;
-			else
-				bg   = color_map[0][bg_color];
+				if (fg_color == bg_color && fg_color != -1)
+					fg_color = 7, bg_color = 0;
 
-			bool     inverse      = !!(screen[offset].attr & A_INVERSE);
-			bool     blink        = !!(screen[offset].attr & A_BLINK);
-			bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
-			bool     underline    = !!(screen[offset].attr & A_UNDERLINE);
-			bool     italic       = !!(screen[offset].attr & A_ITALIC);
+				rgb_t    fg;
+				if (fg_color == -1)
+					fg   = screen[offset].fg_rgb;
+				else
+					fg   = color_map[bold][fg_color];
 
-			if (blink)
-				inverse = blink_state;
+				rgb_t    bg;
+				if (bg_color == -1)
+					bg   = screen[offset].bg_rgb;
+				else
+					bg   = color_map[0][bg_color];
 
-			int     x            = cx * char_w;
-			int     y            = cy * char_h;
+				bool     inverse      = !!(screen[offset].attr & A_INVERSE);
+				bool     blink        = !!(screen[offset].attr & A_BLINK);
+				bool     strikethrough= !!(screen[offset].attr & A_STRIKETHROUGH);
+				bool     underline    = !!(screen[offset].attr & A_UNDERLINE);
+				bool     italic       = !!(screen[offset].attr & A_ITALIC);
 
-			if (global_invert)
-				std::swap(fg, bg);
+				if (blink)
+					inverse = blink_state;
 
-			if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, italic, fg, bg, x, y, *out, *out_w, *out_h)) {
-				for(int cy=y; cy<y + char_h; cy++) {
-					for(int cx=x; cx<x + char_w; cx++) {
-						(*out)[cy * *out_w * 3 + cx * 3 + 0] = rand();
-						(*out)[cy * *out_w * 3 + cx * 3 + 1] = rand();
-						(*out)[cy * *out_w * 3 + cx * 3 + 2] = rand();
+				int     x            = cx * char_w;
+				int     y            = cy * char_h;
+
+				if (global_invert)
+					std::swap(fg, bg);
+
+				if (!f->draw_glyph(c, char_h, intensity, inverse, underline, strikethrough, italic, fg, bg, x, y, *out, *out_w, *out_h)) {
+					for(int cy=y; cy<y + char_h; cy++) {
+						for(int cx=x; cx<x + char_w; cx++) {
+							(*out)[cy * *out_w * 3 + cx * 3 + 0] = rand();
+							(*out)[cy * *out_w * 3 + cx * 3 + 1] = rand();
+							(*out)[cy * *out_w * 3 + cx * 3 + 2] = rand();
+						}
 					}
 				}
 			}
 		}
+
+		if (!frame_cache)
+			frame_cache = reinterpret_cast<uint8_t *>(calloc(1, n_bytes));
+
+		memcpy(frame_cache, *out, n_bytes);
 	}
 }
 

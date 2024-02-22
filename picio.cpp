@@ -190,3 +190,16 @@ void write_tga(const int ncols, const int nrows, const uint8_t *const in, uint8_
 		(*out)[offset++] = in[i + 18 + 0];
 	}
 }
+
+void write_simple(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+{
+	*out_len = ncols * nrows * 3 + 4;
+	*out = new uint8_t[*out_len];
+
+	size_t offset = 0;
+	(*out)[offset++] = ncols >> 8;  // width
+	(*out)[offset++] = ncols;
+	(*out)[offset++] = nrows >> 8;  // height
+	(*out)[offset++] = nrows;
+	memcpy(&(*out)[offset++], in, ncols * nrows * 3);
+}
