@@ -53,6 +53,8 @@ http/https
  * http://ip-adres/stream.mjpeg  <-- MJPEG stream
  * http://ip-adres/frame.bmp     <-- 1 BMP frame
  * http://ip-adres/stream.mbmp   <-- stream of BMP images
+ * http://ip-adres/frame.tga     <-- 1 TGA frame
+ * http://ip-adres/stream.mtga   <-- stream of TGA images
 
 
 demo

@@ -10,7 +10,7 @@
 #include "terminal.h"
 
 
-typedef enum { sct_none, sct_mjpeg, sct_mpng, sct_mbmp } stream_content_type_t;
+typedef enum { sct_none, sct_mjpeg, sct_mpng, sct_mbmp, sct_mtga } stream_content_type_t;
 
 std::pair<uint8_t *, size_t> get_jpeg_frame(terminal *const t, uint64_t *const ts_after, const int max_wait, const int compression_level)
 {
@@ -60,6 +60,22 @@ std::pair<uint8_t *, size_t> get_bmp_frame(terminal *const t, uint64_t *const ts
 	uint8_t *data_out = nullptr;
 	size_t data_out_len = 0;
 	write_bmp(out_w, out_h, out, &data_out, &data_out_len);
+
+	free(out);
+
+	return { data_out, data_out_len };
+}
+
+std::pair<uint8_t *, size_t> get_tga_frame(terminal *const t, uint64_t *const ts_after, const int max_wait, const int compression_level)
+{
+	uint8_t *out   = nullptr;
+	int      out_w = 0;
+	int      out_h = 0;
+	t->render(ts_after, max_wait, &out, &out_w, &out_h);
+
+	uint8_t *data_out = nullptr;
+	size_t data_out_len = 0;
+	write_tga(out_w, out_h, out, &data_out, &data_out_len);
 
 	free(out);
 
@@ -136,6 +152,25 @@ void get_frame_bmp(const std::string url, net_io *const io, const void *const pa
 	free(bmp.first);
 }
 
+void get_frame_tga(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+{
+	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
+
+	uint64_t after_ts = 0;
+	auto     tga      = get_tga_frame(hsp->t, &after_ts, hsp->max_wait, hsp->compression_level);
+
+	std::string reply =
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: image/tga\r\n"
+			"\r\n";
+
+	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
+		io->send(tga.first, tga.second);
+
+	free(tga.first);
+}
+
+
 void stream_frames(net_io *const io, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
 {
 	std::string reply =
@@ -165,6 +200,8 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 			get_jpeg_frame(parameters->t, &ts, parameters->max_wait, parameters->compression_level), format = "jpeg";
 		else if (type == sct_mbmp)
 			image = get_bmp_frame(parameters->t, &ts, parameters->max_wait, 100), format = "bmp";
+		else if (type == sct_mtga)
+			image = get_tga_frame(parameters->t, &ts, parameters->max_wait, 100), format = "tga";
 
 		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), image.second);
 
@@ -207,6 +244,8 @@ void get_stream(const std::string url, net_io *const io, const void *const param
 		sct = sct_mpng;
 	else if (extension == "mbmp")
 		sct = sct_mbmp;
+	else if (extension == "mtga")
+		sct = sct_mtga;
 
 	if (sct != sct_none)
 		stream_frames(io, hsp, sct, stop_flag);
@@ -221,9 +260,11 @@ httpd * start_http_server(const std::string & bind_ip, const int http_port, http
 	url_map.insert({ "/frame.jpeg",   get_frame_jpeg });
 	url_map.insert({ "/frame.png",    get_frame_png });
 	url_map.insert({ "/frame.bmp",    get_frame_bmp });
+	url_map.insert({ "/frame.tga",    get_frame_tga });
 	url_map.insert({ "/stream.mjpeg", get_stream });
 	url_map.insert({ "/stream.mpng",  get_stream });
 	url_map.insert({ "/stream.mbmp",  get_stream });
+	url_map.insert({ "/stream.mtga",  get_stream });
 
 	return new httpd(bind_ip, http_port, url_map, hsp, tls_key_certificate);
 }

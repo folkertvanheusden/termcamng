@@ -163,3 +163,30 @@ void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_
 		}
 	}
 }
+
+void write_tga(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len)
+{
+	*out_len = ncols * nrows * 3 + 18;
+	*out = new uint8_t[*out_len];
+
+	size_t offset = 0;
+	(*out)[offset++] = 0;  // id length
+	(*out)[offset++] = 0;  // colormap (none)
+	(*out)[offset++] = 2;  // image type: uncompressed truecolor
+	offset += 5;  // color map specification
+	(*out)[offset++] = 0;  // x origin
+	(*out)[offset++] = 0;
+	(*out)[offset++] = 0;  // y origin
+	(*out)[offset++] = 0;
+	(*out)[offset++] = ncols;
+	(*out)[offset++] = ncols >> 8;  // width
+	(*out)[offset++] = nrows;
+	(*out)[offset++] = nrows >> 8;  // height
+	(*out)[offset++] = 24;  // bit per pixel
+	(*out)[offset++] = 32;  // top to bottom
+	for(size_t i=0; i<nrows * ncols * 3; i += 3) {
+		(*out)[offset++] = in[i + 18 + 2];
+		(*out)[offset++] = in[i + 18 + 1];
+		(*out)[offset++] = in[i + 18 + 0];
+	}
+}

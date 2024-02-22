@@ -19,3 +19,4 @@ public:
 extern thread_local myjpeg my_jpeg;
 
 void write_bmp(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len);
+void write_tga(const int ncols, const int nrows, const uint8_t *const in, uint8_t **out, size_t *out_len);
