@@ -118,26 +118,21 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 		}
 	}
 	else if (bitmap->pixel_mode == FT_PIXEL_MODE_GRAY) {
-		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+		int use_w = std::min(int(bitmap->width), dest_width - x);
+		int use_h = std::min(int(bitmap->rows), dest_height - y);
+		int start_y = y < 0 ? abs(y) : 0;
+
+		for(int glyph_y=start_y; glyph_y<use_h; glyph_y++) {
 			int screen_y = glyph_y + y;
+			int screen_buffer_offset = screen_y * dest_width * 3;
+			int io_base = glyph_y * bitmap->width;
 
-			if (screen_y < 0)
-				continue;
-
-			if (screen_y >= dest_height)
-				break;
-
-			const int screen_buffer_offset = screen_y * dest_width * 3;
-
-			for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+			for(int glyph_x=0; glyph_x<use_w; glyph_x++) {
 				int screen_x = glyph_x + x;
-
-				if (screen_x >= dest_width)
-					break;
 
 				int local_screen_buffer_offset = screen_buffer_offset + screen_x * 3;
 
-				int io = glyph_y * bitmap->width + glyph_x;
+				int io = io_base + glyph_x;
 
 				int pixel_v = bitmap->buffer[io] * max / 255;
 
