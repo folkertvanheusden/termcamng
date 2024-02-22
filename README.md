@@ -51,6 +51,8 @@ http/https
  * http://ip-adres/stream.mpng   <-- stream of PNG images
  * http://ip-adres/frame.jpeg    <-- 1 JPEG frame
  * http://ip-adres/stream.mjpeg  <-- MJPEG stream
+ * http://ip-adres/frame.bmp     <-- 1 BMP frame
+ * http://ip-adres/stream.mbmp   <-- stream of BMP images
 
 
 demo
