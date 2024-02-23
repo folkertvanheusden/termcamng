@@ -18,30 +18,29 @@ typedef void (*writer)(const int ncols, const int nrows, const int compression_l
 class cached_renderer
 {
 private:
-	terminal *const t        { nullptr };
-	uint64_t        ts_after { 0       };
-	writer          pw       { nullptr };
-	int             cl       { 100     };
-	std::mutex      lock;
-	uint8_t        *prev     { nullptr };
-	size_t          prev_size{ 0       };
+	writer      pw       { nullptr };
+	http_server_parameters_t *hsp { nullptr };
+	uint64_t    ts_after { 0       };
+	std::mutex  lock;
+	uint8_t    *prev     { nullptr };
+	size_t      prev_size{ 0       };
 
 public:
-	cached_renderer(terminal *const t, writer pw, const int compression_level): t(t), pw(pw), cl(compression_level) {
+	cached_renderer(writer pw, http_server_parameters_t *const hsp): pw(pw), hsp(hsp) {
 	}
 
 	virtual ~cached_renderer() {
 		free(prev);
 	}
 
-	void get_frame(const int max_wait, uint8_t **out, size_t *out_size) {
+	std::pair<uint8_t *, size_t> get_frame() {
 		uint8_t *temp   = nullptr;
 		int      temp_w = 0;
 		int      temp_h = 0;
-		if (t->render(&ts_after, max_wait, &temp, &temp_w, &temp_h, prev == nullptr)) {
+		if (hsp->t->render(&ts_after, hsp->max_wait, &temp, &temp_w, &temp_h, prev == nullptr)) {
 			uint8_t *compressed      = nullptr;
 			size_t   compressed_size = 0;
-			pw(temp_w, temp_h, cl, temp, &compressed, &compressed_size);
+			pw(temp_w, temp_h, hsp->compression_level, temp, &compressed, &compressed_size);
 			free(temp);
 
 			std::unique_lock<std::mutex> lck(lock);
@@ -50,44 +49,33 @@ public:
 			prev_size = compressed_size;
 		}
 
-		*out = reinterpret_cast<uint8_t *>(malloc(prev_size));
-		memcpy(*out, prev, prev_size);
-		*out_size = prev_size;
+		uint8_t *out = reinterpret_cast<uint8_t *>(malloc(prev_size));
+		memcpy(out, prev, prev_size);
+
+		return { out, prev_size };
 	}
 };
 
 std::map<std::string, cached_renderer *> cr;
 
-std::pair<uint8_t *, size_t> get_jpeg_frame(const int max_wait)
+std::pair<uint8_t *, size_t> get_jpeg_frame()
 {
-	uint8_t *data_out = nullptr;
-	size_t   data_out_len = 0;
-	cr.find("jpg")->second->get_frame(max_wait, &data_out, &data_out_len);
-	return { data_out, data_out_len };
+	return cr.find("jpg")->second->get_frame();
 }
 
-std::pair<uint8_t *, size_t> get_png_frame(const int max_wait)
+std::pair<uint8_t *, size_t> get_png_frame()
 {
-	uint8_t *data_out = nullptr;
-	size_t   data_out_len = 0;
-	cr.find("png")->second->get_frame(max_wait, &data_out, &data_out_len);
-	return { data_out, data_out_len };
+	return cr.find("png")->second->get_frame();
 }
 
-std::pair<uint8_t *, size_t> get_bmp_frame(const int max_wait)
+std::pair<uint8_t *, size_t> get_bmp_frame()
 {
-	uint8_t *data_out = nullptr;
-	size_t   data_out_len = 0;
-	cr.find("bmp")->second->get_frame(max_wait, &data_out, &data_out_len);
-	return { data_out, data_out_len };
+	return cr.find("bmp")->second->get_frame();
 }
 
-std::pair<uint8_t *, size_t> get_tga_frame(const int max_wait)
+std::pair<uint8_t *, size_t> get_tga_frame()
 {
-	uint8_t *data_out = nullptr;
-	size_t   data_out_len = 0;
-	cr.find("tga")->second->get_frame(max_wait, &data_out, &data_out_len);
-	return { data_out, data_out_len };
+	return cr.find("tga")->second->get_frame();
 }
 
 void get_html_root(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
@@ -108,9 +96,7 @@ void get_html_root(const std::string url, net_io *const io, const void *const pa
 
 void get_frame_jpeg(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
-	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
-
-	auto     jpeg     = get_jpeg_frame(hsp->max_wait);
+	auto     jpeg     = get_jpeg_frame();
 
 	std::string reply =
 			"HTTP/1.0 200 OK\r\n"
@@ -125,9 +111,7 @@ void get_frame_jpeg(const std::string url, net_io *const io, const void *const p
 
 void get_frame_png(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
-	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
-
-	auto     png      = get_png_frame(hsp->max_wait);
+	auto     png      = get_png_frame();
 
 	std::string reply =
 			"HTTP/1.0 200 OK\r\n"
@@ -142,9 +126,7 @@ void get_frame_png(const std::string url, net_io *const io, const void *const pa
 
 void get_frame_bmp(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
-	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
-
-	auto     bmp      = get_bmp_frame(hsp->max_wait);
+	auto     bmp      = get_bmp_frame();
 
 	std::string reply =
 			"HTTP/1.0 200 OK\r\n"
@@ -159,9 +141,7 @@ void get_frame_bmp(const std::string url, net_io *const io, const void *const pa
 
 void get_frame_tga(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
 {
-	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
-
-	auto     tga      = get_tga_frame(hsp->max_wait);
+	auto     tga      = get_tga_frame();
 
 	std::string reply =
 			"HTTP/1.0 200 OK\r\n"
@@ -173,7 +153,6 @@ void get_frame_tga(const std::string url, net_io *const io, const void *const pa
 
 	free(tga.first);
 }
-
 
 void stream_frames(net_io *const io, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
 {
@@ -197,13 +176,13 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 		std::string format = "";
 
 		if (type == sct_mpng)
-			image = get_png_frame (parameters->max_wait), format = "png";
+			image = get_png_frame (), format = "png";
 		else if (type == sct_mjpeg)
-			image = get_jpeg_frame(parameters->max_wait), format = "jpeg";
+			image = get_jpeg_frame(), format = "jpeg";
 		else if (type == sct_mbmp)
-			image = get_bmp_frame (parameters->max_wait), format = "bmp";
+			image = get_bmp_frame (), format = "bmp";
 		else if (type == sct_mtga)
-			image = get_tga_frame (parameters->max_wait), format = "tga";
+			image = get_tga_frame (), format = "tga";
 
 		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), image.second);
 
@@ -268,10 +247,10 @@ httpd * start_http_server(const std::string & bind_ip, const int http_port, http
 	url_map.insert({ "/stream.mbmp",  get_stream });
 	url_map.insert({ "/stream.mtga",  get_stream });
 
-	cr.insert({ "jpg", new cached_renderer(hsp->t, write_jpg, hsp->compression_level) });
-	cr.insert({ "png", new cached_renderer(hsp->t, write_png, hsp->compression_level) });
-	cr.insert({ "bmp", new cached_renderer(hsp->t, write_bmp, hsp->compression_level) });
-	cr.insert({ "tga", new cached_renderer(hsp->t, write_tga, hsp->compression_level) });
+	cr.insert({ "jpg", new cached_renderer(write_jpg, hsp) });
+	cr.insert({ "png", new cached_renderer(write_png, hsp) });
+	cr.insert({ "bmp", new cached_renderer(write_bmp, hsp) });
+	cr.insert({ "tga", new cached_renderer(write_tga, hsp) });
 
 	return new httpd(bind_ip, http_port, url_map, hsp, tls_key_certificate);
 }

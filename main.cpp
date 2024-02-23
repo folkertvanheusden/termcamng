@@ -676,7 +676,6 @@ int main(int argc, char *argv[])
 		server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
 		httpd *s_h = { nullptr };
-
 		httpd *h   = start_http_server(http_bind, http_port, &server_parameters, { });
 
 		if (https_port != 0) {
