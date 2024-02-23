@@ -10,6 +10,7 @@
 
 #include <freetype2/ft2build.h>
 #include FT_FREETYPE_H
+#include <freetype/ftglyph.h>
 
 #include <unicode/ustring.h>
 
@@ -20,6 +21,12 @@
 
 extern std::mutex freetype2_lock;
 extern std::mutex fontconfig_lock;
+
+typedef struct {
+	FT_Bitmap bitmap;
+	int       horiBearingX;
+	int       bitmap_top;
+} glyph_cache_entry_t;
 
 class font
 {
@@ -33,6 +40,8 @@ protected:
 	int                  font_width   { 0 };
 	int                  max_ascender { 0 };
 	std::vector<FT_Face> faces;
+	std::vector<std::map<int, glyph_cache_entry_t> > glyph_cache;
+	std::vector<std::map<int, glyph_cache_entry_t> > glyph_cache_italic;
 
 	int get_intensity_multiplier(const intensity_t i);
 

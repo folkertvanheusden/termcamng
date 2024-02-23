@@ -2,6 +2,7 @@
 #include <mutex>
 #include <string>
 #include <fontconfig/fontconfig.h>
+#include <freetype/ftbitmap.h>
 #include <freetype/ftglyph.h>
 
 #include "error.h"
@@ -35,6 +36,8 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 		faces.push_back(face);
 	}
 
+	glyph_cache.resize(faces.size());
+
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
 	for(UChar32 c = 32; c < 127; c++) {
@@ -51,6 +54,16 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 font::~font()
 {
 	const std::lock_guard<std::mutex> lock(freetype2_lock);
+
+	for(auto & face: glyph_cache) {
+		for(auto & element: face)
+			FT_Bitmap_Done(library, &element.second.bitmap);
+	}
+
+	for(auto & face: glyph_cache_italic) {
+		for(auto & element: face)
+			FT_Bitmap_Done(library, &element.second.bitmap);
+	}
 
 	for(auto f : faces)
 		FT_Done_Face(f);
@@ -208,8 +221,50 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			if (glyph_index == 0 && face < faces.size() - 1)
 				continue;
 
-			if (FT_Load_Glyph(faces.at(face), glyph_index, 0))
-				continue;
+			auto it = italic ? glyph_cache_italic.at(face).find(glyph_index) : glyph_cache.at(face).find(glyph_index);
+
+			if (it == glyph_cache.at(face).end()) {
+				if (FT_Load_Glyph(faces.at(face), glyph_index, 0))
+					continue;
+
+				FT_GlyphSlot slot = faces.at(face)->glyph;
+				if (!slot)
+					continue;
+				FT_Glyph glyph { };
+				FT_Get_Glyph(slot, &glyph);
+
+				if (italic) {  // FIXME
+					FT_Matrix matrix { };
+					matrix.xx = 0x10000;
+					matrix.xy = 0x5000;
+					matrix.yx = 0;
+					matrix.yy = 0x10000;
+					if (FT_Glyph_Transform(glyph, &matrix, nullptr))
+						dolog(ll_info, "transform error");
+				}
+
+				FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, true);
+
+				glyph_cache_entry_t entry { };
+				FT_Bitmap_Init(&entry.bitmap);
+				FT_Bitmap_Copy(library, &reinterpret_cast<FT_BitmapGlyph>(glyph)->bitmap, &entry.bitmap);
+				entry.horiBearingX = slot->metrics.horiBearingX;
+				entry.bitmap_top   = slot->bitmap_top;
+
+				FT_Done_Glyph(glyph);
+
+				if (italic) {
+					glyph_cache_italic.at(face).insert({ glyph_index, entry });
+					it = glyph_cache_italic.at(face).find(glyph_index);
+				}
+				else {
+					glyph_cache.at(face).insert({ glyph_index, entry });
+					it = glyph_cache.at(face).find(glyph_index);
+				}
+			}
+
+			int     draw_x = x + it->second.horiBearingX / 64;
+			int     draw_y = y + max_ascender / 64 - it->second.bitmap_top;
 
 			// draw background
 			uint8_t max = get_intensity_multiplier(intensity);
@@ -229,30 +284,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 				}
 			}
 
-			FT_GlyphSlot slot = faces.at(face)->glyph;
-			if (!slot)
-				continue;
-			FT_Glyph glyph { };
-			FT_Get_Glyph(slot, &glyph);
-
-			if (italic) {
-				FT_Matrix matrix { };
-				matrix.xx = 0x10000;
-				matrix.xy = 0x5000;
-				matrix.yx = 0;
-				matrix.yy = 0x10000;
-				if (FT_Glyph_Transform(glyph, &matrix, nullptr))
-					dolog(ll_info, "transform error");
-			}
-
-			FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, nullptr, true);
-
-			int          draw_x = x + slot->metrics.horiBearingX / 64;
-			int          draw_y = y + max_ascender / 64 - slot->bitmap_top;
-
-			draw_glyph_bitmap(&reinterpret_cast<FT_BitmapGlyph>(glyph)->bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
-
-			FT_Done_Glyph(glyph);
+			draw_glyph_bitmap(&it->second.bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
 
 			return true;
 		}
