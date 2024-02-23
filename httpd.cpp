@@ -42,8 +42,8 @@ void httpd::handle_request(net_io *const io, const std::string & endpoint)
 {
 	std::string request_headers;
 
-	while(request_headers.find("\r\n\r\n") == std::string::npos) {
-		char buffer[4096];
+	while(request_headers.find("\r\n\r\n") == std::string::npos && request_headers.find("\n\n") == std::string::npos) {
+		char buffer[4096] { };
 
 		int rrc = io->read(reinterpret_cast<uint8_t *>(buffer), sizeof buffer);
 		if (rrc == 0) {  // connection close before request headers have been received
