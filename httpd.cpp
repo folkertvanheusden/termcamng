@@ -38,7 +38,7 @@ httpd::~httpd()
 	close(server_fd);
 }
 
-bool httpd::handle_request(net_io *const io, const std::string & endpoint)
+void httpd::handle_request(net_io *const io, const std::string & endpoint)
 {
 	std::string request_headers;
 
@@ -48,12 +48,12 @@ bool httpd::handle_request(net_io *const io, const std::string & endpoint)
 		int rrc = io->read(reinterpret_cast<uint8_t *>(buffer), sizeof buffer);
 		if (rrc == 0) {  // connection close before request headers have been received
 			dolog(ll_info, "httpd::handle_request: connection closed");
-			return false;
+			return;
 		}
 
 		if (rrc == -1) {
 			dolog(ll_info, "httpd::handle_request: read failed");
-			return false;
+			break;
 		}
 
 		request_headers += std::string(buffer, rrc);
@@ -65,19 +65,19 @@ bool httpd::handle_request(net_io *const io, const std::string & endpoint)
 
 		if (request_lines.size() == 0) {
 			dolog(ll_info, "httpd::handle_request: end of request headers not found");
-			return false;
+			return;
 		}
 	}
 
 	auto request = split(request_lines.at(0), " ");
 	if (request.size() < 3) {
 		dolog(ll_info, "httpd::handle_request: request line malformed");
-		return false;
+		return;
 	}
 
 	if (request.at(0) != "GET" && request.at(0) != "HEAD") {
 		dolog(ll_info, "httpd::handle_request: not a GET/HEAD request");
-		return false;
+		return;
 	}
 
 	auto it = url_map.find(request.at(1));
@@ -89,14 +89,12 @@ bool httpd::handle_request(net_io *const io, const std::string & endpoint)
 
 		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
-		return false;
+		return;
 	}
 
 	dolog(ll_info, "httpd::handle_request(%s): requested url %s", endpoint.c_str(), request.at(1).c_str());
 
 	it->second(request.at(1), io, parameters, stop_flag, request.at(0) == "HEAD");
-
-	return true;
 }
 
 void httpd::operator()()
@@ -133,9 +131,7 @@ void httpd::operator()()
 				else
 					io = new net_io_fd(client_fd);
 
-				while(handle_request(io, endpoint) == true) {
-					// HTTP/1.1
-				}
+				handle_request(io, endpoint);
 
 				delete io;
 
