@@ -41,8 +41,9 @@ https-port: 0
 # https-key:
 # https-certificate:
 
-# set to 0 to let the server only transmit a
-# frame when a change is detected
+# Set to 0 to let the server only transmit a
+# frame when a change is detected: this is problematic
+# with some browsers.
 minimum-fps: 3
 
 ssh-addr: 127.0.0.1
