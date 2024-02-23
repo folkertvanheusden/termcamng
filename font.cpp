@@ -37,6 +37,7 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 	}
 
 	glyph_cache.resize(faces.size());
+	glyph_cache_italic.resize(faces.size());
 
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
@@ -217,7 +218,6 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			FT_Select_Charmap(faces.at(face), encoding);
 
 			int glyph_index = FT_Get_Char_Index(faces.at(face), utf_character);
-
 			if (glyph_index == 0 && face < faces.size() - 1)
 				continue;
 
@@ -233,7 +233,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 				FT_Glyph glyph { };
 				FT_Get_Glyph(slot, &glyph);
 
-				if (italic) {  // FIXME
+				if (italic) {
 					FT_Matrix matrix { };
 					matrix.xx = 0x10000;
 					matrix.xy = 0x5000;
