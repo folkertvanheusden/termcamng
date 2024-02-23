@@ -1,4 +1,5 @@
 #include <map>
+#include <optional>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,11 +34,11 @@ public:
 		free(prev);
 	}
 
-	std::pair<uint8_t *, size_t> get_frame() {
+	std::optional<std::pair<uint8_t *, size_t> > get_frame(const bool peek) {
 		uint8_t *temp   = nullptr;
 		int      temp_w = 0;
 		int      temp_h = 0;
-		if (hsp->t->render(&ts_after, hsp->max_wait, &temp, &temp_w, &temp_h, prev == nullptr)) {
+		if (hsp->t->render(&ts_after, hsp->max_wait, &temp, &temp_w, &temp_h, prev == nullptr && peek == false)) {
 			uint8_t *compressed      = nullptr;
 			size_t   compressed_size = 0;
 			pw(temp_w, temp_h, hsp->compression_level, temp, &compressed, &compressed_size);
@@ -48,40 +49,43 @@ public:
 			prev      = compressed;
 			prev_size = compressed_size;
 		}
+		else if (peek) {
+			return { };
+		}
 
 		uint8_t *out = reinterpret_cast<uint8_t *>(malloc(prev_size));
 		memcpy(out, prev, prev_size);
 
-		return { out, prev_size };
+		return { { out, prev_size } };
 	}
 };
 
 std::map<std::string, cached_renderer *> cr;
 
-std::pair<uint8_t *, size_t> get_jpeg_frame()
+std::optional<std::pair<uint8_t *, size_t> > get_jpeg_frame(const bool peek)
 {
-	return cr.find("jpg")->second->get_frame();
+	return cr.find("jpg")->second->get_frame(peek);
 }
 
-std::pair<uint8_t *, size_t> get_png_frame()
+std::optional<std::pair<uint8_t *, size_t> > get_png_frame(const bool peek)
 {
-	return cr.find("png")->second->get_frame();
+	return cr.find("png")->second->get_frame(peek);
 }
 
-std::pair<uint8_t *, size_t> get_bmp_frame()
+std::optional<std::pair<uint8_t *, size_t> > get_bmp_frame(const bool peek)
 {
-	return cr.find("bmp")->second->get_frame();
+	return cr.find("bmp")->second->get_frame(peek);
 }
 
-std::pair<uint8_t *, size_t> get_tga_frame()
+std::optional<std::pair<uint8_t *, size_t> > get_tga_frame(const bool peek)
 {
-	return cr.find("tga")->second->get_frame();
+	return cr.find("tga")->second->get_frame(peek);
 }
 
-void get_html_root(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void get_html_root(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
 {
 	std::string reply = 
-			"HTTP/1.0 200 OK\r\n"
+			"HTTP/1.0 " + std::string(peek ? "304" : "200") + " OK\r\n"
 			"Content-Type: text/html\r\n"
 			"\r\n"
 			"<!DOCTYPE html>"
@@ -94,64 +98,47 @@ void get_html_root(const std::string url, net_io *const io, const void *const pa
 	io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-void get_frame_jpeg(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void send_frame(net_io *const io, const std::string & mime_type, std::optional<std::pair<uint8_t *, size_t> > image)
 {
-	auto     jpeg     = get_jpeg_frame();
-
-	std::string reply =
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: image/jpeg\r\n"
+	if (image.has_value() == false) {
+		std::string reply =
+			"HTTP/1.0 304 OK\r\n"
+			"Content-Type: image/" + mime_type + "\r\n"
 			"\r\n";
 
-	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
-		io->send(jpeg.first, jpeg.second);
+		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+	}
+	else {
+		std::string reply =
+			"HTTP/1.0 200 OK\r\n"
+			"Content-Type: image/" + mime_type + "\r\n"
+			"\r\n";
 
-	free(jpeg.first);
+		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
+			io->send(image.value().first, image.value().second);
+
+		free(image.value().first);
+	}
 }
 
-void get_frame_png(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void get_frame_jpeg(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
 {
-	auto     png      = get_png_frame();
-
-	std::string reply =
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: image/png\r\n"
-			"\r\n";
-
-	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
-		io->send(png.first, png.second);
-
-	free(png.first);
+	send_frame(io, "jpeg", get_jpeg_frame(peek));
 }
 
-void get_frame_bmp(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void get_frame_png(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
 {
-	auto     bmp      = get_bmp_frame();
-
-	std::string reply =
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: image/bmp\r\n"
-			"\r\n";
-
-	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
-		io->send(bmp.first, bmp.second);
-
-	free(bmp.first);
+	send_frame(io, "png", get_png_frame(peek));
 }
 
-void get_frame_tga(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void get_frame_bmp(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
 {
-	auto     tga      = get_tga_frame();
+	send_frame(io, "bmp", get_bmp_frame(peek));
+}
 
-	std::string reply =
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: image/tga\r\n"
-			"\r\n";
-
-	if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
-		io->send(tga.first, tga.second);
-
-	free(tga.first);
+void get_frame_tga(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
+{
+	send_frame(io, "tga", get_tga_frame(peek));
 }
 
 void stream_frames(net_io *const io, const http_server_parameters_t *const parameters, const stream_content_type_t type, std::atomic_bool & stop_flag)
@@ -172,41 +159,41 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 	}
 
 	for(;!stop_flag;) {
-		std::pair<uint8_t *, size_t> image;
+		std::optional<std::pair<uint8_t *, size_t> > image;
 		std::string format = "";
 
 		if (type == sct_mpng)
-			image = get_png_frame (), format = "png";
+			image = get_png_frame (false), format = "png";
 		else if (type == sct_mjpeg)
-			image = get_jpeg_frame(), format = "jpeg";
+			image = get_jpeg_frame(false), format = "jpeg";
 		else if (type == sct_mbmp)
-			image = get_bmp_frame (), format = "bmp";
+			image = get_bmp_frame (false), format = "bmp";
 		else if (type == sct_mtga)
-			image = get_tga_frame (), format = "tga";
+			image = get_tga_frame (false), format = "tga";
 
-		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), image.second);
+		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), image.value().second);
 
 		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
 			dolog(ll_debug, "stream_frames: failed sending multipart http headers");
 
-			free(image.first);
+			free(image.value().first);
 
 			break;
 		}
 
-		if (io->send(image.first, image.second) == false) {
+		if (io->send(image.value().first, image.value().second) == false) {
 			dolog(ll_debug, "stream_frames: failed sending frame data");
 
-			free(image.first);
+			free(image.value().first);
 
 			break;
 		}
 
-		free(image.first);
+		free(image.value().first);
 	}
 }
 
-void get_stream(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag)
+void get_stream(const std::string url, net_io *const io, const void *const parameters, std::atomic_bool & stop_flag, const bool peek)
 {
 	const http_server_parameters_t *const hsp = reinterpret_cast<const http_server_parameters_t *>(parameters);
 
@@ -234,7 +221,7 @@ void get_stream(const std::string url, net_io *const io, const void *const param
 
 httpd * start_http_server(const std::string & bind_ip, const int http_port, http_server_parameters_t *const hsp, const std::optional<std::pair<std::string, std::string> > & tls_key_certificate)
 {
-	std::map<std::string, std::function<void (const std::string url, net_io *const io, const void *, std::atomic_bool & stop_flag)> > url_map;
+	std::map<std::string, std::function<void (const std::string url, net_io *const io, const void *, std::atomic_bool & stop_flag, const bool peek)> > url_map;
 
 	url_map.insert({ "/",             get_html_root });
 	url_map.insert({ "/index.html",   get_html_root });

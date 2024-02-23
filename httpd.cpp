@@ -18,7 +18,7 @@
 #include "time.h"
 
 
-httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag)> > & url_map, const void *const parameters, const std::optional<std::pair<std::string, std::string> > tls_key_certificate) :
+httpd::httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag, const bool peek)> > & url_map, const void *const parameters, const std::optional<std::pair<std::string, std::string> > tls_key_certificate) :
 	url_map(url_map),
 	parameters(parameters),
 	tls_key_certificate(tls_key_certificate)
@@ -75,15 +75,7 @@ void httpd::handle_request(net_io *const io, const std::string & endpoint)
 		return;
 	}
 
-	if (request.at(0) == "HEAD") {
-		std::string reply = "HTTP/1.0 200 OK\r\n";
-
-		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
-
-		return;
-	}
-
-	if (request.at(0) != "GET") {
+	if (request.at(0) != "GET" && request.at(0) != "HEAD") {
 		dolog(ll_info, "httpd::handle_request: not a GET/HEAD request");
 		return;
 	}
@@ -102,7 +94,7 @@ void httpd::handle_request(net_io *const io, const std::string & endpoint)
 
 	dolog(ll_info, "httpd::handle_request(%s): requested url %s", endpoint.c_str(), request.at(1).c_str());
 
-	it->second(request.at(1), io, parameters, stop_flag);
+	it->second(request.at(1), io, parameters, stop_flag, request.at(0) == "HEAD");
 }
 
 void httpd::operator()()
