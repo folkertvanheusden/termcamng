@@ -49,9 +49,9 @@ private:
 	escape_type_t     escape_type { ET_NONE };
 	std::string       escape_value;
 	bool              escape      { false };
-	int               fg_col_ansi { 37 };
+	int               fg_col_ansi { 7 };
 	rgb_t             fg_rgb      { 255, 255, 255 };
-	int               bg_col_ansi { 40 };
+	int               bg_col_ansi { 0 };
 	rgb_t             bg_rgb      { 0, 0, 0 };
 	int               attr        {  0 };
 	rgb_t             color_map[2][8];
