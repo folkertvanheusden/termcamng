@@ -20,7 +20,7 @@ private:
 
 	const std::optional<std::pair<std::string, std::string> > tls_key_certificate;
 
-	void handle_request(net_io *const io, const std::string & endpoint);
+	bool handle_request(net_io *const io, const std::string & endpoint);
 
 public:
 	httpd(const std::string & bind_interface, const int bind_port, const std::map<std::string, std::function<void (const std::string, net_io *const io, const void *, std::atomic_bool & stop_flag, const bool peek)> > & url_map, const void *const parameters, const std::optional<std::pair<std::string, std::string> > tls_key_certificate);
