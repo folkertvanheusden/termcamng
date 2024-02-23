@@ -1,7 +1,7 @@
 # (C) 2020-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 cmake_minimum_required(VERSION 3.9.4)
 
-project(termcamng VERSION 7.0)
+project(termcamng VERSION 8.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
