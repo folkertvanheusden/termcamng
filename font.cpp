@@ -248,10 +248,10 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height
 	}
 
 	if (strikethrough) {
-		const int middle_line = bitmap->rows / 2;
+		const int middle_line = *result_height / 2;
 		const int offset      = middle_line * *result_width * 3;
 
-		for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+		for(unsigned glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_buffer_offset = offset + glyph_x * 3;
 
 			if (screen_buffer_offset >= 0) {
@@ -265,13 +265,13 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height
 	if (underline) {
 		int pixel_v = invert ? 0 : max;
 
-		for(unsigned int glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+		for(unsigned int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_x = glyph_x;
 
 			if (screen_x >= *result_width)
 				break;
 
-			int screen_buffer_offset = (height - 1) * *result_width * 3 + screen_x * 3;
+			int screen_buffer_offset = (*result_height - 2) * *result_width * 3 + screen_x * 3;
 
 			(*result)[screen_buffer_offset + 0] = (pixel_v * fg.r) >> 8;
 			(*result)[screen_buffer_offset + 1] = (pixel_v * fg.g) >> 8;
