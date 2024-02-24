@@ -1,4 +1,5 @@
 // (C) 2017-2024 by folkert van heusden, released under Apache License v2.0
+#include <cassert>
 #include <mutex>
 #include <string>
 #include <fontconfig/fontconfig.h>
@@ -338,8 +339,11 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 		delete [] work;
 	}
 	else {
-		for(int y=0; y<result_height; y++)
-			memcpy(&dest[(y + dest_y) * dest_width * 3 + dest_x * 3], &result[result_width * y * 3], result_width * 3);
+		int use_width  = std::min(dest_width  - dest_x, result_width );
+		int use_height = std::min(dest_height - dest_y, result_height);
+
+		for(int y=0; y<use_height; y++)
+			memcpy(&dest[(y + dest_y) * dest_width * 3 + dest_x * 3], &result[result_width * y * 3], use_width * 3);
 	}
 
 	delete [] result;
