@@ -286,18 +286,19 @@ typedef struct {
         double r, g, b;
 } pixel_t;
 
-void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
+void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	uint8_t *result        = nullptr;
 	int      result_width  = 0;
 	int      result_height = 0;
-	draw_glyph_bitmap_low(bitmap, fg, bg, has_color, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
+	draw_glyph_bitmap_low(&glyph->bitmap, fg, bg, has_color, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
 
 	// resize & copy to x, y
-	if (result_width > font_width || result_height > font_height) {
-		const double x_scale_temp = double(font_width)  / result_width;
+	if (result_width + glyph->horiBearingX / 64 > font_width || result_height > font_height) {
+		const double x_scale_temp =        font_width   / (result_width + glyph->horiBearingX / 64.);
 		const double y_scale_temp = double(font_height) / result_height;
 		const double smallest_scale = std::min(x_scale_temp, y_scale_temp);
+		const double scaled_bearing = glyph->horiBearingX / 64 * smallest_scale;
 
 		pixel_t *work = new pixel_t[font_width * font_height]();
 
@@ -318,10 +319,12 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const FT_Int dest_x,
 			}
 		}
 
+		printf("%f %d: %f\n", max_ascender / 64.0, glyph->bitmap_top, max_ascender / 64.0 - glyph->bitmap_top);
+
 		// TODO: check for out of bounds writes
 		for(int y=0; y<font_height; y++) {
 			int yo  = y * font_width;
-			int o   = (y + dest_y) * dest_width * 3 + dest_x * 3;
+			int o   = (y + dest_y + max_ascender / 64.0 - glyph->bitmap_top) * dest_width * 3 + dest_x * 3 + scaled_bearing;
 
 			for(int x=0, i = yo; x<font_width; x++, i++, o += 3) {
 				if (work[i].n) {
@@ -340,11 +343,14 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const FT_Int dest_x,
 		delete [] work;
 	}
 	else {
-		int use_width  = std::min(dest_width  - dest_x, result_width );
-		int use_height = std::min(dest_height - dest_y, result_height);
+
+		int work_dest_x = dest_x + glyph->horiBearingX / 64;
+		int use_width   = std::min(dest_width  - work_dest_x, result_width);
+		int work_dest_y = dest_y + max_ascender / 64.0 - glyph->bitmap_top;
+		int use_height  = std::min(dest_height - work_dest_y, result_height);
 
 		for(int y=0; y<use_height; y++)
-			memcpy(&dest[(y + dest_y) * dest_width * 3 + dest_x * 3], &result[result_width * y * 3], use_width * 3);
+			memcpy(&dest[(work_dest_y + y) * dest_width * 3 + work_dest_x * 3], &result[result_width * y * 3], use_width * 3);
 	}
 
 	delete [] result;
@@ -423,19 +429,6 @@ bool font::draw_glyph(const UChar32 utf_character, const intensity_t intensity, 
 						}
 					}
 
-					int draw_x = 0;
-					int draw_y = 0;
-					int temp_ascender = max_ascender / 64;
-
-					if (temp_ascender <= it->second.bitmap_top) {
-						draw_x = x;
-						draw_y = y;
-					}
-					else {
-						draw_x = x + it->second.horiBearingX / 64;
-						draw_y = y + temp_ascender - it->second.bitmap_top;
-					}
-
 					// draw background
 					uint8_t max = get_intensity_multiplier(intensity);
 					uint8_t bg_r = invert ? fg.r * max / 255 : bg.r * max / 255;
@@ -454,7 +447,7 @@ bool font::draw_glyph(const UChar32 utf_character, const intensity_t intensity, 
 						}
 					}
 
-					draw_glyph_bitmap(&it->second.bitmap, draw_x, draw_y, fg, bg, FT_HAS_COLOR(faces.at(face)), intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+					draw_glyph_bitmap(&it->second, x, y, fg, bg, FT_HAS_COLOR(faces.at(face)), intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
 
 					return true;
 				}
