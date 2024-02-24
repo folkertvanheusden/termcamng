@@ -94,7 +94,7 @@ int font::get_intensity_multiplier(const intensity_t i)
 	return 200;
 }
 
-void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height)
+void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height)
 {
 	const uint8_t max = get_intensity_multiplier(intensity);
 
@@ -286,12 +286,12 @@ typedef struct {
         double r, g, b;
 } pixel_t;
 
-void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
+void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	uint8_t *result        = nullptr;
 	int      result_width  = 0;
 	int      result_height = 0;
-	draw_glyph_bitmap_low(bitmap, height, fg, bg, has_color, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
+	draw_glyph_bitmap_low(bitmap, fg, bg, has_color, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
 
 	// resize & copy to x, y
 	if (result_width > font_width || result_height > font_height) {
@@ -360,7 +360,7 @@ int font::get_height() const
 	return font_height;
 }
 
-bool font::draw_glyph(const UChar32 utf_character, const int output_height, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
+bool font::draw_glyph(const UChar32 utf_character, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, const bool italic, const rgb_t & fg, const rgb_t & bg, const int x, const int y, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	std::vector<FT_Encoding> encodings { ft_encoding_symbol, ft_encoding_unicode };
 
@@ -442,7 +442,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 					uint8_t bg_g = invert ? fg.g * max / 255 : bg.g * max / 255;
 					uint8_t bg_b = invert ? fg.b * max / 255 : bg.b * max / 255;
 
-					for(int cy=0; cy<output_height; cy++) {
+					for(int cy=0; cy<font_height; cy++) {
 						int offset_y = (y + cy) * dest_width * 3;
 
 						for(int cx=0; cx<font_width; cx++) {
@@ -454,7 +454,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 						}
 					}
 
-					draw_glyph_bitmap(&it->second.bitmap, output_height, draw_x, draw_y, fg, bg, FT_HAS_COLOR(faces.at(face)), intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+					draw_glyph_bitmap(&it->second.bitmap, draw_x, draw_y, fg, bg, FT_HAS_COLOR(faces.at(face)), intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
 
 					return true;
 				}
