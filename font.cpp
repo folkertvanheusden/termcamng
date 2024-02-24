@@ -318,6 +318,7 @@ void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, co
 			}
 		}
 
+		// TODO: check for out of bounds writes
 		for(int y=0; y<font_height; y++) {
 			int yo  = y * font_width;
 			int o   = (y + dest_y) * dest_width * 3 + dest_x * 3;
