@@ -93,7 +93,7 @@ int font::get_intensity_multiplier(const intensity_t i)
 	return 200;
 }
 
-void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height)
+void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height)
 {
 	const uint8_t max = get_intensity_multiplier(intensity);
 
@@ -186,9 +186,17 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height
 					pixel_vb = max - pixel_vb;
 				}
 
-				(*result)[local_screen_buffer_offset + 0] = pixel_vr;
-				(*result)[local_screen_buffer_offset + 1] = pixel_vg;
-				(*result)[local_screen_buffer_offset + 2] = pixel_vb;
+				if (has_color) {
+					(*result)[local_screen_buffer_offset + 0] = pixel_vr;
+					(*result)[local_screen_buffer_offset + 1] = pixel_vg;
+					(*result)[local_screen_buffer_offset + 2] = pixel_vb;
+				}
+				else {
+					int sub = max - pixel_vr;
+					(*result)[local_screen_buffer_offset + 0] = (pixel_vr * fg.r + sub * bg.r) >> 8;
+					(*result)[local_screen_buffer_offset + 1] = (pixel_vr * fg.g + sub * bg.g) >> 8;
+					(*result)[local_screen_buffer_offset + 2] = (pixel_vr * fg.b + sub * bg.b) >> 8;
+				}
 			}
 		}
 	}
@@ -217,9 +225,17 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height
 					pixel_vb = max - pixel_vb;
 				}
 
-				(*result)[local_screen_buffer_offset + 0] = pixel_vr;
-				(*result)[local_screen_buffer_offset + 1] = pixel_vg;
-				(*result)[local_screen_buffer_offset + 2] = pixel_vb;
+				if (has_color) {
+					(*result)[local_screen_buffer_offset + 0] = pixel_vr;
+					(*result)[local_screen_buffer_offset + 1] = pixel_vg;
+					(*result)[local_screen_buffer_offset + 2] = pixel_vb;
+				}
+				else {
+					int sub = max - pixel_vr;
+					(*result)[local_screen_buffer_offset + 0] = (pixel_vr * fg.r + sub * bg.r) >> 8;
+					(*result)[local_screen_buffer_offset + 1] = (pixel_vr * fg.g + sub * bg.g) >> 8;
+					(*result)[local_screen_buffer_offset + 2] = (pixel_vr * fg.b + sub * bg.b) >> 8;
+				}
 			}
 		}
 	}
@@ -269,12 +285,12 @@ typedef struct {
         double r, g, b;
 } pixel_t;
 
-void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
+void font::draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int height, const FT_Int dest_x, const FT_Int dest_y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height)
 {
 	uint8_t *result        = nullptr;
 	int      result_width  = 0;
 	int      result_height = 0;
-	draw_glyph_bitmap_low(bitmap, height, fg, bg, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
+	draw_glyph_bitmap_low(bitmap, height, fg, bg, has_color, intensity, invert, underline, strikethrough, &result, &result_width, &result_height);
 
 	// resize & copy to x, y
 	if (result_width > font_width || result_height > font_height) {
@@ -433,7 +449,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 						}
 					}
 
-					draw_glyph_bitmap(&it->second.bitmap, output_height, draw_x, draw_y, fg, bg, intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
+					draw_glyph_bitmap(&it->second.bitmap, output_height, draw_x, draw_y, fg, bg, FT_HAS_COLOR(faces.at(face)), intensity, invert, underline, strikethrough, dest, dest_width, dest_height);
 
 					return true;
 				}
