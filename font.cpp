@@ -319,8 +319,6 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 			}
 		}
 
-		printf("%f %d: %f\n", max_ascender / 64.0, glyph->bitmap_top, max_ascender / 64.0 - glyph->bitmap_top);
-
 		// TODO: check for out of bounds writes
 		for(int y=0; y<font_height; y++) {
 			int yo  = y * font_width;
