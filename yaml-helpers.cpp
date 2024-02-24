@@ -1,4 +1,5 @@
 #include <map>
+#include <optional>
 #include <string>
 #include <string.h>
 #include <vector>
@@ -24,6 +25,16 @@ int yaml_get_int(const YAML::Node & node, const std::string & key, const std::st
 	}
 	catch(YAML::InvalidNode & yin) {
 		throw myformat("yaml_get_int: item \"%s\" (%s) is missing in YAML file", key.c_str(), description.c_str());
+	}
+}
+
+std::optional<int> yaml_get_int_optional(const YAML::Node & node, const std::string & key)
+{
+	try {
+		return node[key].as<int>();
+	}
+	catch(YAML::InvalidNode & yin) {
+		return { };
 	}
 }
 

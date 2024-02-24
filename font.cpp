@@ -15,7 +15,7 @@ FT_Library font::library;
 std::mutex freetype2_lock;
 std::mutex fontconfig_lock;
 
-font::font(const std::vector<std::string> & font_files, const int font_height) : font_height(font_height)
+font::font(const std::vector<std::string> & font_files, std::optional<int> font_width_in, const int font_height) : font_height(font_height)
 {
 	FT_Init_FreeType(&font::library);
 
@@ -31,7 +31,7 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 
 		FT_Select_Charmap(face, ft_encoding_unicode);
 
-		FT_Set_Char_Size(face, font_height * 64, font_height * 64, 72, 72);
+		FT_Set_Char_Size(face, font_width_in.has_value() ? font_width_in.value() * 64 : 0, font_height * 64, 72, 72);
 
 		faces.push_back(face);
 	}
@@ -41,15 +41,25 @@ font::font(const std::vector<std::string> & font_files, const int font_height) :
 
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
-	for(UChar32 c = 32; c < 127; c++) {
+	int temp_width  = 0;
+	int glyph_index = FT_Get_Char_Index(faces.at(0), 'm');
+	for(UChar32 c = 33; c < 127; c++) {
 		int glyph_index = FT_Get_Char_Index(faces.at(0), c);
 
-		if (FT_Load_Glyph(faces.at(0), glyph_index, 0) == 0) {
-			font_width   = std::max(font_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);
-
+		if (FT_Load_Glyph(faces.at(0), glyph_index, FT_LOAD_NO_BITMAP) == 0) {
+			temp_width   = std::max(temp_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);  // width should be all the same!
 			max_ascender = std::max(max_ascender, int(faces.at(0)->glyph->metrics.horiBearingY));
 		}
 	}
+
+
+	if (this->font_height == 0)
+		this->font_height = max_ascender / 64;
+
+	if (font_width_in.has_value() == false)
+		font_width = temp_width;
+	else
+		font_width = font_width_in.value();
 }
 
 font::~font()
@@ -224,7 +234,7 @@ bool font::draw_glyph(const UChar32 utf_character, const int output_height, cons
 			auto it = italic ? glyph_cache_italic.at(face).find(glyph_index) : glyph_cache.at(face).find(glyph_index);
 
 			if (it == glyph_cache.at(face).end()) {
-				if (FT_Load_Glyph(faces.at(face), glyph_index, 0))
+				if (FT_Load_Glyph(faces.at(face), glyph_index, FT_LOAD_NO_BITMAP))
 					continue;
 
 				FT_GlyphSlot slot = faces.at(face)->glyph;

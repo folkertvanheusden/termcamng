@@ -1,8 +1,13 @@
+# font-width is optional
+#font-width: 12
 font-height: 16
 
+# sudo apt-get install fonts-noto-mono fonts-noto-color-emoji fonts-wine fonts-unifont
 font-files:
- - /usr/share/fonts/truetype/unifont/unifont_sample.ttf
- - /usr/share/wine/fonts/wingding.ttf
+ - /usr/share/fonts/truetype/noto/NotoMono-Regular.ttf
+ - /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf
+ - /usr/share/fonts/truetype/wine/wingding.ttf
+ - /usr/share/fonts/opentype/unifont/unifont.otf
 
 local-output: false
 
@@ -12,7 +17,7 @@ fork: false
 width: 80
 height: 25
 
-compression-level: 34
+compression-level: 15
 
 telnet-addr: 127.0.0.1
 # set to 0 to disable
