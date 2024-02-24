@@ -320,7 +320,7 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 			}
 		}
 
-		// TODO: check for out of bounds writes
+		// TODO: check for out of bounds writes (x)
 		int work_dest_y = dest_y + max_ascender / 64.0 - scaled_bitmap_top;
 		int use_height  = std::min(dest_height - work_dest_y, font_height);
 
