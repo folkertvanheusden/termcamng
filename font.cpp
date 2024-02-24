@@ -329,7 +329,7 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 			int temp = y + work_dest_y;
 			if (temp < 0)
 				continue;
-			int o   = temp * dest_width * 3 + dest_x * 3 + scaled_bearing;
+			int o   = temp * dest_width * 3 + (dest_x + scaled_bearing) * 3;
 
 			for(int x=0, i = yo; x<font_width; x++, i++, o += 3) {
 				if (work[i].n) {
