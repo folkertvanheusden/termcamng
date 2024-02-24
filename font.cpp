@@ -295,10 +295,11 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 
 	// resize & copy to x, y
 	if (result_width + glyph->horiBearingX / 64 > font_width || result_height > font_height) {
-		const double x_scale_temp =        font_width   / (result_width + glyph->horiBearingX / 64.);
-		const double y_scale_temp = double(font_height) / result_height;
-		const double smallest_scale = std::min(x_scale_temp, y_scale_temp);
-		const double scaled_bearing = glyph->horiBearingX / 64 * smallest_scale;
+		const double x_scale_temp      =        font_width   / (result_width + glyph->horiBearingX / 64.);
+		const double y_scale_temp      = double(font_height) / result_height;
+		const double smallest_scale    = std::min(x_scale_temp, y_scale_temp);
+		const double scaled_bearing    = glyph->horiBearingX / 64 * smallest_scale;
+		const double scaled_bitmap_top = glyph->bitmap_top        * smallest_scale;
 
 		pixel_t *work = new pixel_t[font_width * font_height]();
 
@@ -320,9 +321,15 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 		}
 
 		// TODO: check for out of bounds writes
-		for(int y=0; y<font_height; y++) {
+		int work_dest_y = dest_y + max_ascender / 64.0 - scaled_bitmap_top;
+		int use_height  = std::min(dest_height - work_dest_y, font_height);
+
+		for(int y=0; y<use_height; y++) {
 			int yo  = y * font_width;
-			int o   = (y + dest_y + max_ascender / 64.0 - glyph->bitmap_top) * dest_width * 3 + dest_x * 3 + scaled_bearing;
+			int temp = y + work_dest_y;
+			if (temp < 0)
+				continue;
+			int o   = temp * dest_width * 3 + dest_x * 3 + scaled_bearing;
 
 			for(int x=0, i = yo; x<font_width; x++, i++, o += 3) {
 				if (work[i].n) {
@@ -347,8 +354,12 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 		int work_dest_y = dest_y + max_ascender / 64.0 - glyph->bitmap_top;
 		int use_height  = std::min(dest_height - work_dest_y, result_height);
 
-		for(int y=0; y<use_height; y++)
-			memcpy(&dest[(work_dest_y + y) * dest_width * 3 + work_dest_x * 3], &result[result_width * y * 3], use_width * 3);
+		for(int y=0; y<use_height; y++) {
+			int temp = work_dest_y + y;
+
+			if (temp >= 0)
+				memcpy(&dest[temp * dest_width * 3 + work_dest_x * 3], &result[result_width * y * 3], use_width * 3);
+		}
 	}
 
 	delete [] result;
