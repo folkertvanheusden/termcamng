@@ -42,11 +42,13 @@ protected:
 	std::vector<FT_Face> faces;
 	std::vector<std::map<int, glyph_cache_entry_t> > glyph_cache;
 	std::vector<std::map<int, glyph_cache_entry_t> > glyph_cache_italic;
+	bool                 render_mode_error { false };
 
 	int get_intensity_multiplier(const intensity_t i);
 
 	std::optional<std::tuple<int, int, int, int> > find_text_dimensions(const UChar32 c);
 
+	void draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const int height, const rgb_t & fg, const rgb_t & bg, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height);
 	void draw_glyph_bitmap(const FT_Bitmap *const bitmap, const int output_height, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height);
 
 public:

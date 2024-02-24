@@ -21,8 +21,14 @@ required
  * libfreetype-dev
  * libwolfssl-dev
 
-In the example yaml-file (configuration-file) the fonts from the
-debian fonts-unifont and fonts-wine packages are used.
+
+suggested
+---------
+
+ * fonts-noto-mono
+ * fonts-noto-color-emoji
+ * fonts-wine
+ * fonts-unifont
 
 
 creating
