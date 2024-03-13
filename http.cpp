@@ -34,11 +34,18 @@ public:
 		free(prev);
 	}
 
-	std::optional<std::pair<uint8_t *, size_t> > get_frame(const bool peek) {
-		uint8_t *temp   = nullptr;
-		int      temp_w = 0;
-		int      temp_h = 0;
-		if (hsp->t->render(&ts_after, hsp->max_wait, &temp, &temp_w, &temp_h, prev == nullptr && peek == false)) {
+	std::optional<std::tuple<uint8_t *, size_t, bool> > get_frame(const bool peek) {
+		if (peek && hsp->t->has_new_frame() == false)
+			return { };
+
+		bool     changed = true;
+		uint8_t *temp    = nullptr;
+		int      temp_w  = 0;
+		int      temp_h  = 0;
+		if (hsp->t->has_new_frame() || prev == nullptr) {
+			hsp->t->wait_for_frame(&ts_after, hsp->max_wait);
+			hsp->t->render(&temp, &temp_w, &temp_h);
+
 			uint8_t *compressed      = nullptr;
 			size_t   compressed_size = 0;
 			pw(temp_w, temp_h, hsp->compression_level, temp, &compressed, &compressed_size);
@@ -49,35 +56,37 @@ public:
 			prev      = compressed;
 			prev_size = compressed_size;
 		}
-		else if (peek) {
+		else if (peek)
 			return { };
+		else {
+			changed = false;
 		}
 
 		uint8_t *out = reinterpret_cast<uint8_t *>(malloc(prev_size));
 		memcpy(out, prev, prev_size);
 
-		return { { out, prev_size } };
+		return { { out, prev_size, changed } };
 	}
 };
 
 std::map<std::string, cached_renderer *> cr;
 
-std::optional<std::pair<uint8_t *, size_t> > get_jpeg_frame(const bool peek)
+std::optional<std::tuple<uint8_t *, size_t, bool> > get_jpeg_frame(const bool peek)
 {
 	return cr.find("jpg")->second->get_frame(peek);
 }
 
-std::optional<std::pair<uint8_t *, size_t> > get_png_frame(const bool peek)
+std::optional<std::tuple<uint8_t *, size_t, bool> > get_png_frame(const bool peek)
 {
 	return cr.find("png")->second->get_frame(peek);
 }
 
-std::optional<std::pair<uint8_t *, size_t> > get_bmp_frame(const bool peek)
+std::optional<std::tuple<uint8_t *, size_t, bool> > get_bmp_frame(const bool peek)
 {
 	return cr.find("bmp")->second->get_frame(peek);
 }
 
-std::optional<std::pair<uint8_t *, size_t> > get_tga_frame(const bool peek)
+std::optional<std::tuple<uint8_t *, size_t, bool> > get_tga_frame(const bool peek)
 {
 	return cr.find("tga")->second->get_frame(peek);
 }
@@ -98,7 +107,7 @@ void get_html_root(const std::string url, net_io *const io, const void *const pa
 	io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-void send_frame(net_io *const io, const std::string & mime_type, std::optional<std::pair<uint8_t *, size_t> > image)
+void send_frame(net_io *const io, const std::string & mime_type, std::optional<std::tuple<uint8_t *, size_t, bool> > image)
 {
 	if (image.has_value() == false) {
 		std::string reply =
@@ -109,15 +118,25 @@ void send_frame(net_io *const io, const std::string & mime_type, std::optional<s
 		io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 	}
 	else {
-		std::string reply =
-			"HTTP/1.0 200 OK\r\n"
-			"Content-Type: image/" + mime_type + "\r\n"
-			"\r\n";
+		std::string reply;
+
+		if (std::get<2>(image.value())) {
+			reply =
+				"HTTP/1.0 200 OK\r\n"
+				"Content-Type: image/" + mime_type + "\r\n"
+				"\r\n";
+		}
+		else {
+			reply =
+				"HTTP/1.0 304 OK\r\n"
+				"Content-Type: image/" + mime_type + "\r\n"
+				"\r\n";
+		}
 
 		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()))
-			io->send(image.value().first, image.value().second);
+			io->send(std::get<0>(image.value()), std::get<1>(image.value()));
 
-		free(image.value().first);
+		free(std::get<0>(image.value()));
 	}
 }
 
@@ -159,7 +178,7 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 	}
 
 	for(;!stop_flag;) {
-		std::optional<std::pair<uint8_t *, size_t> > image;
+		std::optional<std::tuple<uint8_t *, size_t, bool> > image;
 		std::string format = "";
 
 		if (type == sct_mpng)
@@ -171,25 +190,21 @@ void stream_frames(net_io *const io, const http_server_parameters_t *const param
 		else if (type == sct_mtga)
 			image = get_tga_frame (false), format = "tga";
 
-		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), image.value().second);
+		std::string reply = myformat("\r\n--myboundary\r\nContent-Type: image/%s\r\nContent-Length: %zu\r\n\r\n", format.c_str(), std::get<1>(image.value()));
 
 		if (io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false) {
 			dolog(ll_debug, "stream_frames: failed sending multipart http headers");
-
-			free(image.value().first);
-
+			free(std::get<0>(image.value()));
 			break;
 		}
 
-		if (io->send(image.value().first, image.value().second) == false) {
+		if (io->send(std::get<0>(image.value()), std::get<1>(image.value())) == false) {
 			dolog(ll_debug, "stream_frames: failed sending frame data");
-
-			free(image.value().first);
-
+			free(std::get<0>(image.value()));
 			break;
 		}
 
-		free(image.value().first);
+		free(std::get<0>(image.value()));
 	}
 }
 

@@ -1039,8 +1039,13 @@ std::optional<std::string> terminal::process_input(const std::string & in)
 	return process_input(in.c_str(), in.size());
 }
 
-bool terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **const out, int *const out_w, int *const out_h, const bool force)
+bool terminal::wait_for_frame(uint64_t *const ts_after, const int max_wait)
 {
+	if (do_render) {
+		*ts_after = latest_update;
+		return true;
+	}
+
 	uint64_t start_wait = get_ms();
 
 	std::unique_lock<std::mutex> lck(lock);
@@ -1058,6 +1063,20 @@ bool terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			cond.wait_for(lck, std::chrono::milliseconds(wait_for_delay));
 	}
 
+	bool rc = latest_update > *ts_after;
+	*ts_after = latest_update;
+	return rc;
+}
+
+void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
+{
+	{
+		std::unique_lock<std::mutex> f_lck(frame_cache_lock);
+		do_render = false;
+	}
+
+	uint64_t start_wait = get_ms();
+
 	if (start_wait - blink_switch_ts >= 60000 / 150) {
 		blink_state     = !blink_state;
 		blink_switch_ts = latest_update;
@@ -1072,19 +1091,8 @@ bool terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 	*out_h = h * char_h;
 	*out   = nullptr;
 
-	// cached?
-	{
-		std::unique_lock<std::mutex> f_lck(frame_cache_lock);
-		if (do_render == false && force == false)
-			return false;
-
-		do_render = false;
-	}
-
 	size_t n_bytes = w * char_w * h * char_h * 3;
 	*out = reinterpret_cast<uint8_t *>(calloc(1, n_bytes));
-
-	*ts_after = latest_update;
 
 	for(int cy=0; cy<h; cy++) {
 		for(int cx=0; cx<w; cx++) {
@@ -1145,8 +1153,6 @@ bool terminal::render(uint64_t *const ts_after, const int max_wait, uint8_t **co
 			}
 		}
 	}
-
-	return true;
 }
 
 char terminal::get_char_at(const int cx, const int cy) const
