@@ -6,7 +6,7 @@ font-height: 16
 font-files:
  - /usr/share/fonts/truetype/noto/NotoMono-Regular.ttf
  - /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf
- - /usr/share/fonts/truetype/wine/wingding.ttf
+ - /usr/share/wine/fonts/wingding.ttf
  - /usr/share/fonts/opentype/unifont/unifont.otf
 
 local-output: false
@@ -69,5 +69,5 @@ stderr-to-stdout: true
 
 logging:
   file: termcamng.log
-  loglevel-files: debug
-  loglevel-screen: debug
+  loglevel-files: warning
+  loglevel-screen: warning
