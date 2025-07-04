@@ -86,17 +86,18 @@ font::~font()
 int font::get_intensity_multiplier(const intensity_t i)
 {
 	if (i == intensity_t::I_DIM)
-		return 145;
+		return 146;
 
 	if (i == intensity_t::I_BOLD)
-		return 255;
+		return 256;
 
-	return 200;
+	return 201;
 }
 
 void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t intensity, const bool invert, const bool underline, const bool strikethrough, uint8_t **const result, int *const result_width, int *const result_height)
 {
-	const uint8_t max = get_intensity_multiplier(intensity);
+	const uint8_t max  = get_intensity_multiplier(intensity);
+	const uint8_t max1 = max - 1;
 
 	*result_height = bitmap->rows;
 
@@ -115,14 +116,14 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 				int screen_buffer_offset = screen_y * *result_width * 3 + glyph_x * 3 + glyph_x * 8;
 
 				for(int xbit=0; xbit < 8; xbit++) {
-					int pixel_v = b & 128 ? max : 0;
+					int pixel_v = b & 128 ? max1 : 0;
 
 					b <<= 1;
 
 					if (invert)
-						pixel_v = max - pixel_v;
+						pixel_v = max1 - pixel_v;
 
-					int sub = max - pixel_v;
+					int sub = max1 - pixel_v;
 
 					if (screen_buffer_offset >= 0) {
 						(*result)[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
@@ -149,12 +150,12 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 				int local_screen_buffer_offset = screen_buffer_offset + screen_x * 3;
 				int io = io_base + glyph_x;
 
-				int pixel_v = bitmap->buffer[io] * max / 255;
+				int pixel_v = (bitmap->buffer[io] * max) >> 8;
 
 				if (invert)
-					pixel_v = max - pixel_v;
+					pixel_v = max1 - pixel_v;
 
-				int sub = max - pixel_v;
+				int sub = max1 - pixel_v;
 
 				(*result)[local_screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
 				(*result)[local_screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
@@ -177,14 +178,14 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 
 				int io = io_base + glyph_x * 3;
 
-				int pixel_vr = bitmap->buffer[io + 0] * max / 255;
-				int pixel_vg = bitmap->buffer[io + 1] * max / 255;
-				int pixel_vb = bitmap->buffer[io + 2] * max / 255;
+				int pixel_vr = (bitmap->buffer[io + 0] * max) >> 8;
+				int pixel_vg = (bitmap->buffer[io + 1] * max) >> 8;
+				int pixel_vb = (bitmap->buffer[io + 2] * max) >> 8;
 
 				if (invert) {
-					pixel_vr = max - pixel_vr;
-					pixel_vg = max - pixel_vg;
-					pixel_vb = max - pixel_vb;
+					pixel_vr = max1 - pixel_vr;
+					pixel_vg = max1 - pixel_vg;
+					pixel_vb = max1 - pixel_vb;
 				}
 
 				if (has_color) {
@@ -216,14 +217,14 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 
 				int io = io_base + glyph_x * 4;
 
-				int pixel_vr = bitmap->buffer[io + 2] * max / 255;
-				int pixel_vg = bitmap->buffer[io + 1] * max / 255;
-				int pixel_vb = bitmap->buffer[io + 0] * max / 255;
+				int pixel_vr = (bitmap->buffer[io + 2] * max) >> 8;
+				int pixel_vg = (bitmap->buffer[io + 1] * max) >> 8;
+				int pixel_vb = (bitmap->buffer[io + 0] * max) >> 8;
 
 				if (invert) {
-					pixel_vr = max - pixel_vr;
-					pixel_vg = max - pixel_vg;
-					pixel_vb = max - pixel_vb;
+					pixel_vr = max1 - pixel_vr;
+					pixel_vg = max1 - pixel_vg;
+					pixel_vb = max1 - pixel_vb;
 				}
 
 				if (has_color) {
@@ -232,7 +233,7 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 					(*result)[local_screen_buffer_offset + 2] = pixel_vb;
 				}
 				else {
-					int sub = max - pixel_vr;
+					int sub = max1 - pixel_vr;
 					(*result)[local_screen_buffer_offset + 0] = (pixel_vr * fg.r + sub * bg.r) >> 8;
 					(*result)[local_screen_buffer_offset + 1] = (pixel_vr * fg.g + sub * bg.g) >> 8;
 					(*result)[local_screen_buffer_offset + 2] = (pixel_vr * fg.b + sub * bg.b) >> 8;
@@ -264,7 +265,7 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 	}
 
 	if (underline) {
-		int pixel_v = invert ? 0 : max;
+		int pixel_v = invert ? 0 : max1;
 
 		for(unsigned int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_x = glyph_x;
@@ -440,9 +441,9 @@ bool font::draw_glyph(const UChar32 utf_character, const intensity_t intensity, 
 
 					// draw background
 					uint8_t max = get_intensity_multiplier(intensity);
-					uint8_t bg_r = invert ? fg.r * max / 255 : bg.r * max / 255;
-					uint8_t bg_g = invert ? fg.g * max / 255 : bg.g * max / 255;
-					uint8_t bg_b = invert ? fg.b * max / 255 : bg.b * max / 255;
+					uint8_t bg_r = invert ? (fg.r * max) >> 8 : (bg.r * max) >> 8;
+					uint8_t bg_g = invert ? (fg.g * max) >> 8 : (bg.g * max) >> 8;
+					uint8_t bg_b = invert ? (fg.b * max) >> 8 : (bg.b * max) >> 8;
 
 					for(int cy=0; cy<font_height; cy++) {
 						int offset_y = (y + cy) * dest_width * 3;
