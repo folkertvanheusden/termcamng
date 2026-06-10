@@ -20,6 +20,7 @@ required
  * libturbojpeg0-dev
  * libfreetype-dev
  * libwolfssl-dev
+ * libfontconfig-dev
 
 
 suggested
