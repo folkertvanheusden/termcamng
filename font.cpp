@@ -88,7 +88,7 @@ int font::get_intensity_multiplier(const intensity_t i)
 		return 146;
 
 	if (i == intensity_t::I_BOLD)
-		return 256;
+		return 255;
 
 	return 201;
 }
