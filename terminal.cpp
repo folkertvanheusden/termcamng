@@ -735,7 +735,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 				else if (par_val == 25)  // blink off
 					attr &= ~A_BLINK;
 				else if (par_val == 7)  // inverse video on
-					attr ^= A_INVERSE;
+					attr |= A_INVERSE;
 				else if (par_val == 27)  // inverse video off
 					attr &= ~A_INVERSE;
 				else if (par_val == 9)  // strikethrough on
