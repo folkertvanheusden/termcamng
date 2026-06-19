@@ -24,6 +24,8 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 
 	reset_v_tab_stops();
 
+	scroll_region = { 0, h };
+
 	// default a h-tab-stop every 8th position? TODO
 	for(int i=0; i<w; i += 8)
 		h_tab_stops.at(i) = true;
@@ -430,6 +432,12 @@ void terminal::emit_character(const uint32_t c)
 	last_character = c;
 }
 
+void terminal::scroll_up()
+{
+	delete_line(scroll_region.first);
+	insert_line(scroll_region.second);
+}
+
 void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines)
 {
 	if (move_to_left)
@@ -439,9 +447,7 @@ void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const
 		y++;
 
 		if (y >= h) {
-			if (do_scroll)
-				delete_line(0);
-
+			scroll_up();
 			y = h - 1;
 
 		}
@@ -656,6 +662,23 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			global_invert = false;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
+	}
+	else if (cmd == 'S') {
+		int n = pars.size() == 1 ? std::stoi(pars[0]) : 1;
+		dolog(ll_info, "scroll %d lines up", n);
+		for(int i=0; i<n; i++)
+			scroll_up();
+	}
+	else if (cmd == 'r') {  // scrolling region
+		if (pars.size() == 1 || pars.size() == 2) {
+			scroll_region.first = std::max(0, std::stoi(pars[0]) - 1);
+			scroll_region.second = h;
+		}
+		if (pars.size() == 2)
+			scroll_region.second = std::max(0, std::stoi(pars[1]) - 1);
+		if (pars.empty())
+			scroll_region = { 0, h };
+		dolog(ll_debug, "set scroll region to %d,%d", scroll_region.first, scroll_region.second);
 	}
 	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
@@ -1020,8 +1043,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		}
 
 		if (y == h) {
-			delete_line(0);
-			
+			scroll_up();
 			y = h - 1;
 		}
 	}

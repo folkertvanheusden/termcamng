@@ -71,6 +71,7 @@ private:
 	std::mutex        frame_cache_lock;
 	bool              do_render   { false };
 	bool              g0          { false };
+	std::pair<int, int> scroll_region { 0, 25 };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;
@@ -84,6 +85,8 @@ public:
 	int  get_height() const { return h; };
 
 	std::pair<int, int> get_current_xy();
+
+	void scroll_up();
 
 	char  get_char_at(const int x, const int y) const;
 	pos_t get_cell_at(const int x, const int y) const;
