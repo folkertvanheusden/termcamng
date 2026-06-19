@@ -84,6 +84,6 @@ If you're interested in video-streaming, you may be interested in
 https://vanheusden.com/constatus/ as well.
 
 
-Written by Folkert van Heusden <mail@vanheusden.com>
+Written by Folkert van Heusden <folkert@vanheusden.com>
 
-License: Apache License v2.0
+License: MIT
