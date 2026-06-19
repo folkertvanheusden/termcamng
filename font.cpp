@@ -44,7 +44,6 @@ font::font(const std::vector<std::string> & font_files, std::optional<int> font_
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
 	int temp_width  = 0;
-	int glyph_index = FT_Get_Char_Index(faces.at(0), 'm');
 	for(UChar32 c = 33; c < 127; c++) {
 		int glyph_index = FT_Get_Char_Index(faces.at(0), c);
 
@@ -105,7 +104,7 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 		*result_width = bitmap->width;
 		*result       = new uint8_t[*result_height * *result_width * 3]();
 
-		for(unsigned int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+		for(unsigned glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
 			int screen_y = glyph_y;
 
 			// assuming width is always multiple of 8
@@ -140,12 +139,12 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 		*result_width = bitmap->width;
 		*result       = new uint8_t[*result_height * *result_width * 3]();
 
-		for(int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+		for(unsigned glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
 			int screen_y = glyph_y;
 			int screen_buffer_offset = screen_y * *result_width * 3;
 			int io_base = glyph_y * bitmap->width;
 
-			for(int glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
+			for(unsigned glyph_x=0; glyph_x<bitmap->width; glyph_x++) {
 				int screen_x = glyph_x;
 				int local_screen_buffer_offset = screen_buffer_offset + screen_x * 3;
 				int io = io_base + glyph_x;
@@ -167,12 +166,12 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 		*result_width = bitmap->width / 3;
 		*result       = new uint8_t[*result_width * *result_height * 3]();
 
-		for(int glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
+		for(unsigned glyph_y=0; glyph_y<bitmap->rows; glyph_y++) {
 			int screen_y = glyph_y;
 			int screen_buffer_offset = screen_y * *result_width * 3;
 			int io_base = glyph_y * bitmap->pitch;
 
-			for(int glyph_x=0; glyph_x<*result_width; glyph_x++) {
+			for(unsigned glyph_x=0; glyph_x<*result_width; glyph_x++) {
 				int screen_x = glyph_x;
 				int local_screen_buffer_offset = screen_buffer_offset + screen_x * 3;
 
@@ -253,7 +252,7 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 		const int middle_line = *result_height / 2;
 		const int offset      = middle_line * *result_width * 3;
 
-		for(unsigned glyph_x=0; glyph_x<*result_width; glyph_x++) {
+		for(int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_buffer_offset = offset + glyph_x * 3;
 
 			if (screen_buffer_offset >= 0) {
@@ -267,7 +266,7 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 	if (underline) {
 		int pixel_v = invert ? 0 : max1;
 
-		for(unsigned int glyph_x=0; glyph_x<*result_width; glyph_x++) {
+		for(int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_x = glyph_x;
 
 			if (screen_x >= *result_width)
