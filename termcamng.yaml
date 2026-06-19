@@ -23,6 +23,9 @@ telnet-addr: 127.0.0.1
 # set to 0 to disable
 telnet-port: 2300
 
+# either ansi or xterm
+terminal-type: xterm
+
 # refresh whole screen in telnet/ssh sessions instead of
 # incremental. this to resolve incompatibilities when the
 # resolution of the program in termcamng differs from the

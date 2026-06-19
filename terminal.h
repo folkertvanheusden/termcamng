@@ -70,6 +70,7 @@ private:
 	bool		  smooth_scrolling { false };  // DECSCLM
 	std::mutex        frame_cache_lock;
 	bool              do_render   { false };
+	bool              g0          { false };
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;

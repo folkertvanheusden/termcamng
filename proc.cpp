@@ -18,7 +18,7 @@
 
 
 // this code needs more error checking TODO
-std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height, const int restart_interval, const bool stderr_to_stdout)
+std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const int width, const int height, const int restart_interval, const bool stderr_to_stdout, const std::string & terminal_type)
 {
 	int fd_master { -1 };
 
@@ -42,7 +42,7 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 		if (setenv("LINES", lines.c_str(), 1) == -1)
 			error_exit(true, "exec_with_pipe: setenv(LINES) failed");
 
-		if (setenv("TERM", "ansi", 1) == -1)
+		if (setenv("TERM", terminal_type.c_str(), 1) == -1)
 			error_exit(true, "exec_with_pipe: setenv(TERM) failed");
 
 		if (dir.empty() == false && chdir(dir.c_str()) == -1)

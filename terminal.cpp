@@ -873,8 +873,10 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 	std::optional<std::string> send_back;
 
 	for(size_t i=0; i<len; i++) {
+		if (g0)
+			g0 = false;
 		// C0
-		if (in[i] == 13) {  // carriage return
+		else if (in[i] == 13) {  // carriage return
 			DLD("CR");
 			x = 0, utf8_len = 0;
 		}
@@ -951,6 +953,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 					DLD("VTS");
 					v_tab_stops.at(y) = true;
 				}
+				else if (in[i] == '(')
+					g0 = true;
 				else {
 					emit_character(in[i]);
 
