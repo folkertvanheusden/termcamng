@@ -1099,12 +1099,12 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 			int      offset       = cy * w + cx;
 			uint32_t c            = screen[offset].c;
 
-			int      bold         = !!(screen[offset].attr & A_BOLD);
-			int      dim          = !!(screen[offset].attr & A_DIM);
+			bool     bold         = screen[offset].attr & A_BOLD;
+			bool     dim          = screen[offset].attr & A_DIM;
 
 			font::intensity_t intensity = font::intensity_t::I_NORMAL;
 
-			if (bold && !dim)
+			if (bold)
 				intensity = font::intensity_t::I_BOLD;
 			else if (dim)
 				intensity = font::intensity_t::I_DIM;
