@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstring>
+#include <signal.h>
 #include <string>
 #include <thread>
 #include <unistd.h>
@@ -226,6 +227,8 @@ void VNCServer::operator()()
 {
 	set_thread_name("vnc-server");
 
+	signal(SIGPIPE, SIG_IGN);
+
 	int s = start_tcp_listen("0.0.0.0", port);
 	dolog(ll_info, "VNC: server started");
 
@@ -236,8 +239,10 @@ void VNCServer::operator()()
 
 		dolog(ll_info, "VNC: incoming session accepted on fd %d", c);
 
-		// TODO threading
-		VNCClientThread(c);
-		close(c);
+		std::thread t([&] {
+				VNCClientThread(c);
+				close(c);
+				});
+		t.detach();
 	}
 }
