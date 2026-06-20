@@ -440,8 +440,14 @@ void terminal::emit_character(const uint32_t c)
 
 void terminal::scroll_up()
 {
-	delete_line(scroll_region.first);
-	insert_line(scroll_region.second);
+	int offset_to   = scroll_region.first * w;
+	int offset_from = (scroll_region.first + 1) * w;
+
+	int n_characters_to_move = w * (scroll_region.second - scroll_region.first);
+	if (n_characters_to_move) {
+		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
+		erase_line(scroll_region.second);
+	}
 }
 
 void terminal::do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines)
