@@ -24,7 +24,7 @@ telnet-addr: 127.0.0.1
 telnet-port: 2300
 
 # either ansi or xterm
-terminal-type: xterm
+terminal-type: xterm-256color
 
 # refresh whole screen in telnet/ssh sessions instead of
 # incremental. this to resolve incompatibilities when the
@@ -63,6 +63,7 @@ ssh-keys: /etc/ssh
 #exec-command: /usr/bin/irssi -c oftc
 #exec-command: /usr/bin/httping -Q -K 192.168.64.100
 exec-command: /usr/bin/htop -d 5
+#exec-command: /usr/bin/btop
 directory: /tmp
 # how long to wait (in seconds) before restarting the exec-command when it has stopped
 # set to -1 to disable this
