@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
 		YAML::Node config             = YAML::LoadFile(cfg_file);
 
 		auto      font_width          = yaml_get_int_optional(config, "font-width");
-		const int font_height         = yaml_get_int(config,    "font-height",  "font height (in pixels)");
+		const int font_height         = yaml_get_int(config,          "font-height", "font height (in pixels)");
 
 		YAML::Node font_map           = yaml_get_yaml_node(config, "font-files", "TTF font file");
 
