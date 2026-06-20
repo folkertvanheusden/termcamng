@@ -32,6 +32,7 @@ add_executable(termcamng
 	terminal.cpp
 	time.cpp
 	utils.cpp
+	vncserver.cpp
 	yaml-helpers.cpp
 	)
 

@@ -31,6 +31,7 @@
 #include "str.h"
 #include "terminal.h"
 #include "utils.h"
+#include "vncserver.h"
 #include "yaml-helpers.h"
 
 
@@ -593,6 +594,8 @@ int main(int argc, char *argv[])
 		const int height              = yaml_get_int(config,    "height",       "terminal console height (e.g. 25)");
 		const int compression_level   = yaml_get_int(config,    "compression-level", "value between 0 (no compression) and 100 (max.)");
 
+		const int vnc_port            = yaml_get_int(config,    "vnc-port",     "VNC port to listen on (0 to disable)");
+
 		const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
 		const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
 
@@ -629,6 +632,12 @@ int main(int argc, char *argv[])
 		signal(SIGPIPE, SIG_IGN);
 
 		terminal t(&f, width, height, &stop);
+
+		VNCServer *vnc { nullptr };
+		if (vnc_port != 0) {
+			vnc = new VNCServer(&t, vnc_port);
+			vnc->begin();
+		}
 
 		const std::string terminal_type = yaml_get_string(config, "terminal-type", "either \"xterm\", \"xterm-256color\" or \"ansi\"");
 		if (terminal_type != "xterm" && terminal_type != "xterm-256color" && terminal_type != "ansi")
@@ -706,7 +715,7 @@ int main(int argc, char *argv[])
 		}
 
 		while(!stop)
-			sleep(1);
+			usleep(101000);
 
 		dolog(ll_info, "Stopping...");
 
@@ -715,6 +724,9 @@ int main(int argc, char *argv[])
 		telnet_thread_handle.join();
 
 		read_program.join();
+
+		if (vnc)
+			delete vnc;
 
 		if (s_h)
 			stop_http_server(s_h);

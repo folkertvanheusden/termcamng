@@ -23,6 +23,9 @@ telnet-addr: 127.0.0.1
 # set to 0 to disable
 telnet-port: 2300
 
+# set to 0 to disable
+vnc-port: 5901
+
 # either ansi or xterm
 terminal-type: xterm-256color
 

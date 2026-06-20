@@ -2,8 +2,9 @@ what it is
 ----------
 
 This program runs an other program in an emulated ANSI terminal.
-The terminal is rendered to a PNG file which is then served via a
-http-/https- (web-)server.
+The terminal is rendered to a PNG or MJPEG stream which is then served
+via a build-in http-/https- (web-)server. It will also function as a
+VNC server.
 You can connect to it using an SSH or telnet program and then interact
 with the program that is running.
 The internal SSH server authenticats via PAM against the local user-
