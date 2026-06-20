@@ -81,7 +81,6 @@ void httpd::handle_request(net_io *const io, const std::string & endpoint)
 	}
 
 	auto it = url_map.find(request.at(1));
-
 	if (it == url_map.end()) {
 		std::string reply = "HTTP/1.0 404 OK\r\n";
 

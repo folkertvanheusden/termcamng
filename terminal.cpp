@@ -24,7 +24,7 @@ terminal::terminal(font *const f, const int w, const int h, std::atomic_bool *co
 
 	reset_v_tab_stops();
 
-	scroll_region = { 0, h };
+	scroll_region = { 0, h - 1 };
 
 	// default a h-tab-stop every 8th position? TODO
 	for(int i=0; i<w; i += 8)
@@ -420,6 +420,11 @@ void terminal::emit_character(const uint32_t c)
 		}
 	}
 
+	while(y >= h) {
+		scroll_up();
+		y--;
+	}
+
 	screen[y * w + x].c           = c;
 	screen[y * w + x].fg_col_ansi = fg_col_ansi;
 	screen[y * w + x].fg_rgb      = fg_rgb;
@@ -677,7 +682,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		if (pars.size() == 2)
 			scroll_region.second = std::max(0, std::stoi(pars[1]) - 1);
 		if (pars.empty())
-			scroll_region = { 0, h };
+			scroll_region = { 0, h - 1 };
 		dolog(ll_debug, "set scroll region to %d,%d", scroll_region.first, scroll_region.second);
 	}
 	else if (cmd == 'M') {  // delete lines
