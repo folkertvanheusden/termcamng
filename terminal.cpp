@@ -683,7 +683,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			scroll_region.second = std::max(0, std::stoi(pars[1]) - 1);
 		if (pars.empty())
 			scroll_region = { 0, h - 1 };
-		DLD("CSI r (%d,%d)", scroll_region.first, scroll_region.second);
+		DLD("CSI r (%d,%d)", scroll_region.first + 1, scroll_region.second + 1);
 	}
 	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
