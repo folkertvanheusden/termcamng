@@ -232,7 +232,14 @@ void VNCServer::operator()()
 	int s = start_tcp_listen("0.0.0.0", port);
 	dolog(ll_info, "VNC: server started");
 
+	pollfd fds[] { { s, POLLIN, 0 } };
+
 	while(!stop_flag) {
+		int rc = poll(fds, 1, 100);
+		if (rc == 0)
+			continue;
+		if (rc == -1)
+			break;
 		int c = accept(s, nullptr, nullptr);
 		if (c == -1)
 			break;
