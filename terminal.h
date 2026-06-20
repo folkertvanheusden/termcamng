@@ -46,6 +46,8 @@ private:
 	pos_t            *screen { nullptr };
 	int               x { 0 };
 	int               y { 0 };
+	int               save_x { 0 };
+	int               save_y { 0 };
 	escape_type_t     escape_type { ET_NONE };
 	std::string       escape_value;
 	bool              escape      { false };

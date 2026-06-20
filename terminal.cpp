@@ -994,6 +994,14 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				}
 				else if (in[i] == '(')
 					g0 = true;
+				else if (in[i] == '7') {
+					save_x = x;
+					save_y = y;
+				}
+				else if (in[i] == '8') {
+					x = save_x;
+					y = save_y;
+				}
 				else {
 					emit_character(in[i]);
 
