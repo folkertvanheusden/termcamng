@@ -133,13 +133,17 @@ bool VNCServer::VNCWaitForEvent(int fd)
 			uint32_t vnc_scan_code = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
 			dolog(ll_debug, "VNC: key pressed with scan code %u (%d)", vnc_scan_code, down);
 			if (down) {
-				if (vnc_scan_code < 0x80) {
+				if (vnc_scan_code < 0x80) {  // regular ascii
 					uint8_t buffer = vnc_scan_code;
 					WRITE(stdin_fd, &buffer, 1);
 				}
-				else if (vnc_scan_code == 65293) {
+				else if (vnc_scan_code == 65293) {  // enter
 					uint8_t buffer[] = { 13, 10 };
 					WRITE(stdin_fd, buffer, sizeof buffer);
+				}
+				else if (vnc_scan_code == 65288) {  // backspace
+					uint8_t buffer = 8;
+					WRITE(stdin_fd, &buffer, 1);
 				}
 			}
 		}
