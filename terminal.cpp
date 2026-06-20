@@ -670,7 +670,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	}
 	else if (cmd == 'S') {
 		int n = pars.size() == 1 ? std::stoi(pars[0]) : 1;
-		dolog(ll_info, "scroll %d lines up", n);
+		DLD("CSI S (%d)", n);
 		for(int i=0; i<n; i++)
 			scroll_up();
 	}
@@ -683,7 +683,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			scroll_region.second = std::max(0, std::stoi(pars[1]) - 1);
 		if (pars.empty())
 			scroll_region = { 0, h - 1 };
-		dolog(ll_debug, "set scroll region to %d,%d", scroll_region.first, scroll_region.second);
+		DLD("CSI r (%d,%d)", scroll_region.first, scroll_region.second);
 	}
 	else if (cmd == 'M') {  // delete lines
 		int n = evaluate_n(par1);
