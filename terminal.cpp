@@ -1057,12 +1057,9 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 	}
 
 	std::unique_lock<std::mutex> lck(lock);
-
 	latest_update = get_ms();
-
 	cond.notify_all();
 
-	std::unique_lock<std::mutex> f_lck(frame_cache_lock);
 	do_render = true;
 
 	return send_back;
@@ -1104,10 +1101,7 @@ bool terminal::wait_for_frame(uint64_t *const ts_after, const int max_wait)
 
 void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 {
-	{
-		std::unique_lock<std::mutex> f_lck(frame_cache_lock);
-		do_render = false;
-	}
+	do_render = false;
 
 	uint64_t start_wait = get_ms();
 

@@ -68,8 +68,7 @@ private:
 	std::vector<bool> v_tab_stops;
 	bool              global_invert    { false };  // DECSNM
 	bool		  smooth_scrolling { false };  // DECSCLM
-	std::mutex        frame_cache_lock;
-	bool              do_render   { false };
+	std::atomic_bool  do_render   { false };
 	bool              g0          { false };
 	std::pair<int, int> scroll_region { 0, 25 };
 
