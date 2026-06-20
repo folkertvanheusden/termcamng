@@ -413,17 +413,18 @@ void terminal::emit_character(const uint32_t c)
 		if (wraparound) {
 			x = 0;
 
-			y++;
+			if (y == scroll_region.second)
+				scroll_up();
+			else
+				y++;
 		}
 		else {
 			x = w - 1;  // will be put back to w below
 		}
 	}
 
-	while(y >= h) {
-		scroll_up();
-		y--;
-	}
+	if (y >= h)
+		y = h - 1;
 
 	screen[y * w + x].c           = c;
 	screen[y * w + x].fg_col_ansi = fg_col_ansi;
@@ -910,7 +911,11 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		}
 		else if (in[i] == 10) {  // new line
 			DLD("NL");
-			y++, utf8_len = 0;
+			if (y == scroll_region.second)
+				scroll_up();
+			else
+				y++;
+			utf8_len = 0;
 		}
 		else if (in[i] == 8) {  // backspace
 			DLD("backspace");
@@ -1047,10 +1052,8 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 			}
 		}
 
-		if (y == h) {
-			scroll_up();
+		if (y >= h)
 			y = h - 1;
-		}
 	}
 
 	std::unique_lock<std::mutex> lck(lock);
