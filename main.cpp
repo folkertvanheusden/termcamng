@@ -630,9 +630,9 @@ int main(int argc, char *argv[])
 
 		terminal t(&f, width, height, &stop);
 
-		const std::string terminal_type = yaml_get_string(config, "terminal-type", "either \"xterm\" or \"ansi\"");
-		if (terminal_type != "xterm" && terminal_type != "ansi")
-			error_exit(false, "terminal-type must be either \"xterm\" or \"ansi\"");
+		const std::string terminal_type = yaml_get_string(config, "terminal-type", "either \"xterm\", \"xterm-256color\" or \"ansi\"");
+		if (terminal_type != "xterm" && terminal_type != "xterm-256color" && terminal_type != "ansi")
+			error_exit(false, "terminal-type must be either \"xterm\", \"xterm-256color\" or \"ansi\"");
 
 		const std::string command    = yaml_get_string(config,  "exec-command", "command to execute and render");
 		const std::string directory  = yaml_get_string(config,  "directory",    "path to chdir for");
