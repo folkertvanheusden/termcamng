@@ -9,6 +9,7 @@ class VNCServer
 private:
 	terminal        *const t   { nullptr };
 	const int        port      { 5901    };
+	const int        stdin_fd  { -1      };
 	std::atomic_bool stop_flag { false   };
 	std::thread     *th        { nullptr };
 
@@ -20,7 +21,7 @@ private:
 	void VNCClientThread(int fd);
 
 public:
-	VNCServer(terminal *const t, const int port) : t(t), port(port) {
+	VNCServer(terminal *const t, const int port, const int stdin_fd) : t(t), port(port), stdin_fd(stdin_fd) {
 	}
 
 	~VNCServer() {

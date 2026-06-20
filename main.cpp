@@ -633,12 +633,6 @@ int main(int argc, char *argv[])
 
 		terminal t(&f, width, height, &stop);
 
-		VNCServer *vnc { nullptr };
-		if (vnc_port != 0) {
-			vnc = new VNCServer(&t, vnc_port);
-			vnc->begin();
-		}
-
 		const std::string terminal_type = yaml_get_string(config, "terminal-type", "either \"xterm\", \"xterm-256color\" or \"ansi\"");
 		if (terminal_type != "xterm" && terminal_type != "xterm-256color" && terminal_type != "ansi")
 			error_exit(false, "terminal-type must be either \"xterm\", \"xterm-256color\" or \"ansi\"");
@@ -667,6 +661,12 @@ int main(int argc, char *argv[])
 
 		auto proc             = exec_with_pipe(command, directory, width, height, restart_interval, stderr_to_stdout, terminal_type);
 		int  program_fd       = std::get<1>(proc);
+
+		VNCServer *vnc { nullptr };
+		if (vnc_port != 0) {
+			vnc = new VNCServer(&t, vnc_port, program_fd);
+			vnc->begin();
+		}
 
 		std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 

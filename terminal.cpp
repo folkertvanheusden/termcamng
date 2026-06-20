@@ -1095,7 +1095,7 @@ bool terminal::wait_for_frame(uint64_t *const ts_after, const int max_wait)
 
 	std::unique_lock<std::mutex> lck(lock);
 
-	while(latest_update <= *ts_after && !*stop_flag && (get_ms() - start_wait < uint64_t(max_wait) || max_wait <= 0)) {
+	while(latest_update <= *ts_after && !*stop_flag && (get_ms() - start_wait < uint64_t(max_wait) || max_wait < 0)) {
 		int wait_for_delay = 500;
 
 		if (max_wait > 0) {

@@ -91,57 +91,75 @@ void VNCServer::VNCClientServerInit(int fd)
 
 bool VNCServer::VNCWaitForEvent(int fd)
 {
-	struct pollfd fds[1] { { fd, POLLIN, 0 } };
-	int rc = poll(fds, 1, 1000 / 5);
-	if (rc == 0)
-		return true;
-	if (rc == -1)
-		return false;
+	int wait = 1000 / 10;
+	pollfd fds[1] { { fd, POLLIN, 0 } };
 
-	uint8_t type_ = 0;
-	READ(fd, &type_, 1);
+	for(;;) {
+		int rc = poll(fds, 1, wait);
+		if (rc == 0)
+			return true;
+		if (rc == -1)
+			return false;
 
-	if (type_ == 0) {  // SetPixelFormat
-		uint8_t buffer[3 + 16];
-		READ(fd, buffer, sizeof buffer);
-	}
-	else if (type_ == 2) {  // SetEncodings
-		uint8_t buffer[3];
-		READ(fd, buffer, sizeof buffer);
+		wait = 0;
 
-		int no_encodings = (buffer[1] << 8) | buffer[2];
-		for(int i=0; i<no_encodings; i++) {
-			uint8_t temp[4];
-			READ(fd, temp, sizeof temp);
-		}
-	}
-	else if (type_ == 3) {  // FramebufferUpdateRequest
-		uint8_t buffer[9];
-		READ(fd, buffer, sizeof buffer);
-		// TODO
-	}
-	else if (type_ == 4) {  // KeyEvent
-		uint8_t buffer[7];
-		READ(fd, buffer, sizeof buffer);
-		uint32_t vnc_scan_code = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
-		// TODO self.PushChar(vnc_scan_code, buffer[0] != 0)
-	}
-	else if (type_ == 5) {  // PointerEvent
-		uint8_t buffer[5];
-		READ(fd, buffer, sizeof buffer);
-	}
-	else if (type_ == 6) {  // ClientCutText
-		uint8_t buffer[7];
-		READ(fd, buffer, sizeof buffer);
-		uint32_t n_to_read = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
-		for(uint32_t i=0; i<n_to_read; i++) {
-			uint8_t buffer[1];
+		uint8_t type_ = 0;
+		READ(fd, &type_, 1);
+
+		if (type_ == 0) {  // SetPixelFormat
+			uint8_t buffer[3 + 16];
 			READ(fd, buffer, sizeof buffer);
 		}
-	}
-	else {
-		dolog(ll_info, "VNC: Client message %d not understood", type_);
-		return false;
+		else if (type_ == 2) {  // SetEncodings
+			uint8_t buffer[3];
+			READ(fd, buffer, sizeof buffer);
+
+			int no_encodings = (buffer[1] << 8) | buffer[2];
+			for(int i=0; i<no_encodings; i++) {
+				uint8_t temp[4];
+				READ(fd, temp, sizeof temp);
+			}
+		}
+		else if (type_ == 3) {  // FramebufferUpdateRequest
+			uint8_t buffer[9];
+			READ(fd, buffer, sizeof buffer);
+			// TODO
+		}
+		else if (type_ == 4) {  // KeyEvent
+			uint8_t buffer[7];
+			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+				break;
+			bool down = buffer[0];
+			uint32_t vnc_scan_code = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
+			dolog(ll_debug, "VNC: key pressed with scan code %u (%d)", vnc_scan_code, down);
+			if (down) {
+				if (vnc_scan_code < 0x80) {
+					uint8_t buffer = vnc_scan_code;
+					WRITE(stdin_fd, &buffer, 1);
+				}
+				else if (vnc_scan_code == 65293) {
+					uint8_t buffer[] = { 13, 10 };
+					WRITE(stdin_fd, buffer, sizeof buffer);
+				}
+			}
+		}
+		else if (type_ == 5) {  // PointerEvent
+			uint8_t buffer[5];
+			READ(fd, buffer, sizeof buffer);
+		}
+		else if (type_ == 6) {  // ClientCutText
+			uint8_t buffer[7];
+			READ(fd, buffer, sizeof buffer);
+			uint32_t n_to_read = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
+			for(uint32_t i=0; i<n_to_read; i++) {
+				uint8_t buffer[1];
+				READ(fd, buffer, sizeof buffer);
+			}
+		}
+		else {
+			dolog(ll_info, "VNC: Client message %d not understood", type_);
+			return false;
+		}
 	}
 
 	return true;
@@ -182,9 +200,9 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 	for(int i=0; i<w*h; i++) {
 		int out_off = i * 4;
 		int in_off  = i * 3;
-		temp[out_off + 0] = pixels[in_off + 0];
+		temp[out_off + 2] = pixels[in_off + 0];
 		temp[out_off + 1] = pixels[in_off + 1];
-		temp[out_off + 2] = pixels[in_off + 2];
+		temp[out_off + 0] = pixels[in_off + 2];
 	}
 	delete [] pixels;
 
@@ -209,12 +227,11 @@ void VNCServer::VNCClientThread(int fd)
 
 	bool first = true;
 	while(!stop_flag) {
-		if (t->wait_for_frame(&ts_after, 100) == false)
-			continue;
-
-		if (VNCSendFrame(fd, first) == false)
-			break;
-		first = false;
+		if (t->wait_for_frame(&ts_after, 10)) {
+			if (VNCSendFrame(fd, first) == false)
+				break;
+			first = false;
+		}
 
 		if (VNCWaitForEvent(fd) == false)
 			break;
