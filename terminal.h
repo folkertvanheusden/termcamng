@@ -30,12 +30,12 @@ typedef enum { ET_NONE, ET_DCS, ET_CSI, ET_ST, ET_OSC } escape_type_t;
 	while(0);
 
 typedef struct {
-	uint32_t c;
-	int      fg_col_ansi;
-	rgb_t    fg_rgb;
-	int      bg_col_ansi;
-	rgb_t    bg_rgb;
-	int      attr;
+	uint32_t             c;
+	int                  fg_col_ansi;
+	std::optional<rgb_t> fg_rgb;
+	int                  bg_col_ansi;
+	std::optional<rgb_t> bg_rgb;
+	int                  attr;
 } pos_t;
 
 class terminal {

@@ -60,14 +60,32 @@ std::string generate_initial_screen(terminal *const t)
 		out += myformat("\033[%dH", y + 1);
 		for(int x=0; x<cur_w; x++) {
 			pos_t c = t->get_cell_at(x, y);
+			bool fg_set = false;
+			bool bg_set = false;
+			if (c.fg_rgb.has_value()) {
+				out += myformat("\033[38;2;%d;%d;%dm", c.fg_rgb.value().r, c.fg_rgb.value().g, c.fg_rgb.value().b);
+				pfg = -1;
+				fg_set = true;
+			}
+			if (c.bg_rgb.has_value()) {
+				out += myformat("\033[48;2;%d;%d;%dm", c.bg_rgb.value().r, c.bg_rgb.value().g, c.bg_rgb.value().b);
+				pbg = -1;
+				bg_set = true;
+			}
+
 			if (pfg != c.fg_col_ansi || pbg != c.bg_col_ansi) {
-				out += myformat("\033[%d;%dm%c", 30 + c.fg_col_ansi, 40 + c.bg_col_ansi, c.c ? c.c : ' ');
+				if (fg_set)
+					out += myformat("\033[%dm", 40 + c.bg_col_ansi);
+				else if (bg_set)
+					out += myformat("\033[%d;%dm", 30 + c.fg_col_ansi);
+				else if (fg_set == false && bg_set == false)
+					out += myformat("\033[%d;%dm", 30 + c.fg_col_ansi, 40 + c.bg_col_ansi);
+
 				pfg = c.fg_col_ansi;
 				pbg = c.bg_col_ansi;
 			}
-			else {
-				out += c.c ? c.c : ' ';
-			}
+
+			out += c.c ? c.c : ' ';
 		}
 	}
 

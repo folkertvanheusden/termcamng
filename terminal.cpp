@@ -1158,14 +1158,14 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 				fg_color = 7, bg_color = 0;
 
 			rgb_t    fg;
-			if (fg_color == -1)
-				fg   = screen[offset].fg_rgb;
+			if (screen[offset].fg_rgb.has_value())
+				fg   = screen[offset].fg_rgb.value();
 			else
 				fg   = color_map[bold][fg_color];
 
 			rgb_t    bg;
-			if (bg_color == -1)
-				bg   = screen[offset].bg_rgb;
+			if (screen[offset].bg_rgb.has_value())
+				bg   = screen[offset].bg_rgb.value();
 			else
 				bg   = color_map[0][bg_color];
 
