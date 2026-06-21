@@ -57,6 +57,11 @@ void httpd::handle_request(net_io *const io, const std::string & endpoint)
 		}
 
 		request_headers += std::string(buffer, rrc);
+
+		if (request_headers.size() > 64 * 1024) {
+			dolog(ll_info, "httpd::handle_request: overly large request headers");
+			return;
+		}
 	}
 
 	auto request_lines = split(request_headers, "\r\n");
