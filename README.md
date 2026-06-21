@@ -1,12 +1,12 @@
 what it is
 ----------
 
-This program runs an other program in an emulated ANSI terminal.
-The terminal is rendered to a PNG or MJPEG stream which is then served
-via a build-in http-/https- (web-)server. It will also function as a
-VNC server.
-You can connect to it using an SSH or telnet program and then interact
-with the program that is running.
+This program runs an other program in an emulated ANSI/xterm terminal.
+The terminal is rendered to a video stream like PNG, MJPEG or VNC. The
+PNG/MJPEG/JPEG/etc is served via an internal webserver. The VNC server
+is also integrated.
+You can connect to it using an SSH, telnet or vnc client and then
+interact with the program that is running.
 The internal SSH server authenticats via PAM against the local user-
 database of the Linux system.
 
@@ -63,6 +63,12 @@ http/https
  * http://ip-adres/stream.mbmp   <-- stream of BMP images
  * http://ip-adres/frame.tga     <-- 1 TGA frame
  * http://ip-adres/stream.mtga   <-- stream of TGA images
+
+
+vlc
+---
+
+ * vncviewer ip-adres:5901
 
 
 demo
