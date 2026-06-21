@@ -95,6 +95,14 @@ If you're interested in video-streaming, you may be interested in
 https://vanheusden.com/constatus/ as well.
 
 
+screenshots
+-----------
+![HTTP stream in Firefox](images/firefox.png)
+![VLC special characters](images/matrix.png)
+![VLC colors](images/rgb.png)
+![telnet via Putty](images/telnet_putty.png)
+
+
 Written by Folkert van Heusden <folkert@vanheusden.com>
 
 License: MIT
