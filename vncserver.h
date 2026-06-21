@@ -18,9 +18,9 @@ private:
 		bool ctrl_pressed;
 	};
 
-	void VNCSendVersion      (int fd);
-	void VNCSecurityHandshake(int fd);
-	void VNCClientServerInit (int fd);
+	bool VNCSendVersion      (int fd);
+	bool VNCSecurityHandshake(int fd);
+	bool VNCClientServerInit (int fd);
 	bool VNCWaitForEvent     (int fd, client_state *const cs);
 	bool VNCSendFrame        (int fd, bool first);
 	void VNCClientThread     (int fd);
