@@ -458,7 +458,7 @@ void terminal::scroll_up()
 	int offset_from = (scroll_region.first + 1) * w;
 
 	int n_characters_to_move = w * (scroll_region.second - scroll_region.first);
-	if (n_characters_to_move > 0 && offset_from < h) {
+	if (n_characters_to_move > 0 && offset_from + n_characters_to_move <= w * h) {
 		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
 		erase_line(scroll_region.second);
 	}
