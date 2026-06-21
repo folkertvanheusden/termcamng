@@ -344,12 +344,13 @@ std::pair<int, int> terminal::get_current_xy()
 
 void terminal::delete_line(const int y)
 {
+	assert(y >= 0);
 	int offset_to   = y * w;
 	int offset_from = (y + 1) * w;
 
 	int n_characters_to_move = w * h - offset_from;
 
-	if (n_characters_to_move == 0)
+	if (n_characters_to_move <= 0)
 		erase_line(y);
 	else {
 		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
@@ -360,6 +361,7 @@ void terminal::delete_line(const int y)
 
 void terminal::insert_line(const int y)
 {
+	assert(y >= 0);
 	int offset_to    = (y + 1) * w;
 	int offset_from  = y * w;
 
@@ -373,26 +375,36 @@ void terminal::insert_line(const int y)
 
 void terminal::insert_character(const int n)
 {
+	assert(x >= 0);
+	assert(y >= 0);
 	int n_left      = w - x - 1;
 	int offset_from = y * w + x;
 	int offset_to   = y * w + x + 1;
+	int max_wh      = w * h;
+
+	if (offset_to + n_left > max_wh || offset_from + n_left > max_wh || n_left <= 0)
+		return;
 
 	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
-
 		erase_cell(x, y);
 	}
 }
 
 void terminal::delete_character(const int n)
 {
+	assert(x >= 0);
+	assert(y >= 0);
 	int n_left      = w - x;
 	int offset_to   = y * w + x;
 	int offset_from = y * w + x + 1;
+	int max_wh      = w * h;
+
+	if (n_left <= 0 || offset_to + n_left > max_wh || offset_from + n_left > max_wh)
+		return;
 
 	for(int i=0; i<n; i++) {
 		memmove(&screen[offset_to], &screen[offset_from], n_left * sizeof(screen[0]));
-
 		erase_cell(w - 1, y);
 	}
 }
@@ -446,7 +458,7 @@ void terminal::scroll_up()
 	int offset_from = (scroll_region.first + 1) * w;
 
 	int n_characters_to_move = w * (scroll_region.second - scroll_region.first);
-	if (n_characters_to_move) {
+	if (n_characters_to_move > 0 && offset_from < h) {
 		memmove(&screen[offset_to], &screen[offset_from], n_characters_to_move * sizeof(screen[0]));
 		erase_line(scroll_region.second);
 	}
@@ -826,14 +838,15 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 	}
 	else if (cmd == 'n') {  // device status report (DSR)
-		DLD("CSI n (%d)", par1);
+		int nr = evaluate_n(par1);
+		DLD("CSI n (%d)", nr);
 
-		if (par1 == 5)  // status report
+		if (nr == 5)  // status report
 			send_back = "\033[0n";  // OK
-		else if (par1 == 6)  // report cursor position (CPR) [row;column]
+		else if (nr == 6)  // report cursor position (CPR) [row;column]
 			send_back = myformat("\033[%d;%dR", y + 1, x + 1);
 		else {
-			dolog(ll_info, "code %d for 'n' not supported", par1);
+			dolog(ll_info, "code %d for 'n' not supported", nr);
 		}
 	}
 	else if (cmd == 'c') {  // "what are you"
@@ -845,31 +858,33 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		const int max_offset = w * h;
 		int offset = y * w + x;
 
-		DLD("CSI X (%d)", par1);
+		int n = evaluate_n(par1);
+		DLD("CSI X (%d)", n);
 
-		if (par1 == 0)
-			par1 = 1;
+		if (n == 0)
+			n = 1;
 
-		for(int i=0; i<par1; i++) {
+		for(int i=0; i<n && offset < max_offset; i++) {
 			screen[offset].c           = ' ';
 			screen[offset].fg_col_ansi = fg_col_ansi;
 			screen[offset].fg_rgb      = fg_rgb;
 			screen[offset].bg_col_ansi = bg_col_ansi;
 			screen[offset].bg_rgb      = bg_rgb;
 			screen[offset].attr        = attr;
-			if (offset++ >= max_offset)
-				break;
+			offset++;
 		}
 	}
 	else if (cmd == 'Y') {  // vertical tab, CVT
-		DLD("CSI Y (%d)", par1);
+		int n = evaluate_n(par1);
+		DLD("CSI Y (%d)", n);
 
-		while(y < h && v_tab_stops.at(y) == false)
-			y++;
+		for(int i=0; i<n; i++) {
+			while(y < h && v_tab_stops.at(y) == false)
+				y++;
+		}
 	}
 	else if (cmd == 'P') {  // delete character
 		int n = evaluate_n(par1);
-
 		DLD("CSI P (%d)", n);
 
 		delete_character(n);
@@ -925,6 +940,9 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 
 	try {
 		for(size_t i=0; i<len; i++) {
+			x = std::clamp(x, 0, w - 1);
+			y = std::clamp(y, 0, h - 1);
+
 			if (g0)
 				g0 = false;
 			// C0
@@ -1087,12 +1105,15 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				y = h - 1;
 		}
 	}
-	catch(std::invalid_argument const & ex) {
-		dolog(ll_info, "Stream produced an \"invalid argument\" exception (%s)", ex.what());
+	catch (std::invalid_argument const& ex) {
+		dolog(ll_info, "Invalid argument in stream: %s", ex.what());
 	}
-        catch (const std::out_of_range & ex) {
-		dolog(ll_info, "Stream produced an \"out of range\" exception (%s)", ex.what());
-        }
+	catch (std::out_of_range const& ex) {
+		dolog(ll_info, "Out of range problem in stream: %s", ex.what());
+	}
+	catch(...) {
+		dolog(ll_warning, "Unexpected exception");
+	}
 
 	std::unique_lock<std::mutex> lck(lock);
 	latest_update = get_ms();
