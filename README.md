@@ -100,7 +100,6 @@ screenshots
 ![HTTP stream in Firefox](images/firefox.png)
 ![VLC special characters](images/matrix.png)
 ![VLC colors](images/rgb.png)
-![telnet via Putty](images/telnet_putty.png)
 
 
 Written by Folkert van Heusden <folkert@vanheusden.com>
