@@ -139,6 +139,7 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
 				return false;
 			// TODO
+			return true;
 		}
 		else if (type_ == 4) {  // KeyEvent
 			uint8_t buffer[7];
