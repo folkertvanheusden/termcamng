@@ -73,6 +73,7 @@ private:
 	std::atomic_bool  do_render   { false };
 	bool              g0          { false };
 	std::pair<int, int> scroll_region { 0, 25 };
+	bool              show_cursor { false };  // should keep track of this per cell
 
 	mutable std::mutex              lock;
 	mutable std::condition_variable cond;

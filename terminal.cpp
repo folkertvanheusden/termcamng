@@ -660,6 +660,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			resize_width(132), x = 0, y = 0;
 		else if (parameters == "?5")  // DECSNM
 			global_invert = true;
+		else if (parameters == "?25")  // DECSET
+			show_cursor = true;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -672,6 +674,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			resize_width(80), x = 0, y = 0;
 		else if (parameters == "?5")  // DECSNM
 			global_invert = false;
+		else if (parameters == "?25")  // DECRSET
+			show_cursor = false;
 		else
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
@@ -1158,13 +1162,13 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 				fg_color = 7, bg_color = 0;
 
 			rgb_t    fg;
-			if (screen[offset].fg_rgb.has_value())
+			if (fg_color == -1)
 				fg   = screen[offset].fg_rgb.value();
 			else
 				fg   = color_map[bold][fg_color];
 
 			rgb_t    bg;
-			if (screen[offset].bg_rgb.has_value())
+			if (bg_color == -1)
 				bg   = screen[offset].bg_rgb.value();
 			else
 				bg   = color_map[0][bg_color];
