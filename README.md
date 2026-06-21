@@ -91,6 +91,9 @@ notes
 No "special characters" showing? Make sure the locale of the system
 is set to utf-8.
 
+If you only see a white screen in VNC, use a different VNC client.
+TightVNC seems to often show this behaviour.
+
 If you're interested in video-streaming, you may be interested in
 https://vanheusden.com/constatus/ as well.
 
