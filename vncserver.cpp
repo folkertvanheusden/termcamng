@@ -89,7 +89,7 @@ void VNCServer::VNCClientServerInit(int fd)
 	dolog(ll_debug, "VNC: end of ClientServerInit");
 }
 
-bool VNCServer::VNCWaitForEvent(int fd)
+bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 {
 	int wait = 1000 / 10;
 	pollfd fds[1] { { fd, POLLIN, 0 } };
@@ -134,7 +134,7 @@ bool VNCServer::VNCWaitForEvent(int fd)
 			dolog(ll_debug, "VNC: key pressed with scan code %u (%d)", vnc_scan_code, down);
 			if (down) {
 				if (vnc_scan_code < 0x80) {  // regular ascii
-					uint8_t buffer = vnc_scan_code;
+					uint8_t buffer = cs->ctrl_pressed ? toupper(vnc_scan_code) - 'A' + 1 : vnc_scan_code;
 					WRITE(stdin_fd, &buffer, 1);
 				}
 				else if (vnc_scan_code == 65293) {  // enter
@@ -146,6 +146,8 @@ bool VNCServer::VNCWaitForEvent(int fd)
 					WRITE(stdin_fd, &buffer, 1);
 				}
 			}
+			if (vnc_scan_code == 0xffe3 || vnc_scan_code == 0xffe4)
+				cs->ctrl_pressed = down;
 		}
 		else if (type_ == 5) {  // PointerEvent
 			uint8_t buffer[5];
@@ -227,9 +229,9 @@ void VNCServer::VNCClientThread(int fd)
 	VNCSecurityHandshake(fd);
 	VNCClientServerInit(fd);
 
-	uint64_t ts_after = 0;
-
-	bool first = true;
+	uint64_t     ts_after = 0;
+	client_state cs { };
+	bool         first    = true;
 	while(!stop_flag) {
 		if (t->wait_for_frame(&ts_after, 10)) {
 			if (VNCSendFrame(fd, first) == false)
@@ -237,7 +239,7 @@ void VNCServer::VNCClientThread(int fd)
 			first = false;
 		}
 
-		if (VNCWaitForEvent(fd) == false)
+		if (VNCWaitForEvent(fd, &cs) == false)
 			break;
 	}
 

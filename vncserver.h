@@ -13,12 +13,16 @@ private:
 	std::atomic_bool stop_flag { false   };
 	std::thread     *th        { nullptr };
 
-	void VNCSendVersion(int fd);
+	struct client_state {
+		bool ctrl_pressed;
+	};
+
+	void VNCSendVersion      (int fd);
 	void VNCSecurityHandshake(int fd);
-	void VNCClientServerInit(int fd);
-	bool VNCWaitForEvent(int fd);
-	bool VNCSendFrame(int fd, bool first);
-	void VNCClientThread(int fd);
+	void VNCClientServerInit (int fd);
+	bool VNCWaitForEvent     (int fd, client_state *const cs);
+	bool VNCSendFrame        (int fd, bool first);
+	void VNCClientThread     (int fd);
 
 public:
 	VNCServer(terminal *const t, const int port, const int stdin_fd) : t(t), port(port), stdin_fd(stdin_fd) {
