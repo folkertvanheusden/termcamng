@@ -8,9 +8,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions("-D_FILE_OFFSET_BITS=64")
 
+#add_compile_options(-fsanitize=address,undefined)
+#add_link_options(-fsanitize=address,undefined)
+
 #add_definitions("-DLOG_TRAFFIC")
 
-set(CMAKE_BUILD_TYPE Debug)
+include(CheckIPOSupported)
+check_ipo_supported(RESULT supported)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+cmake_policy(SET CMP0069 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#set(CMAKE_BUILD_TYPE Debug)
 
 add_compile_options(-Wall -pedantic)
 
