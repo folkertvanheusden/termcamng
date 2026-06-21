@@ -244,8 +244,32 @@ void VNCServer::VNCClientThread(int fd)
 		if (VNCWaitForEvent(fd, &cs) == false)
 			break;
 	}
+	close(fd);
 
 	dolog(ll_info, "VNC: session via fd %d terminated", fd); 
+}
+
+void purge_threads(std::vector<std::thread *> & clients)
+{
+	for(size_t i=0; i<clients.size();) {
+		if (clients[i]->joinable()) {
+			clients[i]->join();
+			delete clients[i];
+			clients.erase(clients.begin() + i);
+		}
+		else {
+			i++;
+		}
+	}
+}
+
+void purge_threads_blocking(std::vector<std::thread *> *const clients)
+{
+	for(auto & client: *clients) {
+		client->join();
+		delete client;
+	}
+	clients->clear();
 }
 
 void VNCServer::operator()()
@@ -259,7 +283,11 @@ void VNCServer::operator()()
 
 	pollfd fds[] { { s, POLLIN, 0 } };
 
+	std::vector<std::thread *> clients;
+
 	while(!stop_flag) {
+		purge_threads(clients);
+
 		int rc = poll(fds, 1, 100);
 		if (rc == 0)
 			continue;
@@ -271,10 +299,8 @@ void VNCServer::operator()()
 
 		dolog(ll_info, "VNC: incoming session accepted on fd %d", c);
 
-		std::thread t([&] {
-				VNCClientThread(c);
-				close(c);
-				});
-		t.detach();
+		clients.push_back(new std::thread(&VNCServer::VNCClientThread, this, c));
 	}
+
+	purge_threads_blocking(&clients);
 }
