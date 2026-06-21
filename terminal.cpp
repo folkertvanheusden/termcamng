@@ -489,10 +489,10 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	std::optional<int> par2;
 
 	if (pars.size() >= 1)
-		par1 = std::atoi(pars[0].c_str());
+		par1 = std::stoi(pars[0]);
 
 	if (pars.size() >= 2)
-		par2 = std::atoi(pars[1].c_str());
+		par2 = std::stoi(pars[1]);
 
 	if (cmd == 'A') {  // cursor up
 		int n = evaluate_n(par1);
@@ -709,17 +709,20 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 'm') {
 		DLD("CSI m (%s)", parameters.c_str());
 
-		if (pars.empty())
-			fg_col_ansi = 7, bg_col_ansi = 0, attr = 0;
+		if (pars.empty()) {
+			fg_col_ansi = 7;
+			bg_col_ansi = 0;
+			attr        = 0;
+		}
 		else {
-			bool fg_is_rgb = true;
-			int rgb_fg_index = -1;
-			bool is_fg = true;
-			bool bg_is_rgb = true;
-			int rgb_bg_index = -1;
+			bool fg_is_rgb    = true;
+			int  rgb_fg_index = -1;
+			bool is_fg        = true;
+			bool bg_is_rgb    = true;
+			int  rgb_bg_index = -1;
 
 			for(size_t i=0; i<pars.size(); i++) {
-				int par_val = std::atoi(pars.at(i).c_str());
+				int par_val = std::stoi(pars.at(i));
 
 				if (par_val >= 30 && par_val <= 37)  // fg color
 					fg_col_ansi = par_val - 30;
@@ -798,21 +801,25 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			}
 
 			if (rgb_fg_index != -1 && fg_is_rgb == true && pars.size() - rgb_fg_index >= 3) {
-				fg_rgb.r = std::atoi(pars.at(rgb_fg_index + 0).c_str());
-				fg_rgb.g = std::atoi(pars.at(rgb_fg_index + 1).c_str());
-				fg_rgb.b = std::atoi(pars.at(rgb_fg_index + 2).c_str());
+				fg_rgb.r = std::stoi(pars.at(rgb_fg_index + 0));
+				fg_rgb.g = std::stoi(pars.at(rgb_fg_index + 1));
+				fg_rgb.b = std::stoi(pars.at(rgb_fg_index + 2));
 			}
 			if (rgb_fg_index != -1 && fg_is_rgb == false && pars.size() - rgb_fg_index >= 1) {
-				fg_rgb = color_map_256c[std::atoi(pars.at(rgb_fg_index).c_str())];
+				int index = std::stoi(pars.at(rgb_fg_index));
+				if (index >= 0 && index < 256)
+					fg_rgb = color_map_256c[index];
 			}
 
 			if (rgb_bg_index != -1 && pars.size() - rgb_bg_index >= 3) {
-				bg_rgb.r = std::atoi(pars.at(rgb_bg_index + 0).c_str());
-				bg_rgb.g = std::atoi(pars.at(rgb_bg_index + 1).c_str());
-				bg_rgb.b = std::atoi(pars.at(rgb_bg_index + 2).c_str());
+				bg_rgb.r = std::stoi(pars.at(rgb_bg_index + 0));
+				bg_rgb.g = std::stoi(pars.at(rgb_bg_index + 1));
+				bg_rgb.b = std::stoi(pars.at(rgb_bg_index + 2));
 			}
 			if (rgb_bg_index != -1 && bg_is_rgb == false && pars.size() - rgb_bg_index >= 1) {
-				bg_rgb = color_map_256c[std::atoi(pars.at(rgb_bg_index).c_str())];
+				int index = std::stoi(pars.at(rgb_bg_index));
+				if (index >=0 && index < 256)
+					bg_rgb = color_map_256c[index];
 			}
 		}
 	}
@@ -833,6 +840,7 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		send_back = "\033[?1;0c";
 	}
 	else if (cmd == 'X') {  // erase character
+		const int max_offset = w * h;
 		int offset = y * w + x;
 
 		DLD("CSI X (%d)", par1);
@@ -841,12 +849,14 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			par1 = 1;
 
 		for(int i=0; i<par1; i++) {
-			screen[offset + i].c           = ' ';
-			screen[offset + i].fg_col_ansi = fg_col_ansi;
-			screen[offset + i].fg_rgb      = fg_rgb;
-			screen[offset + i].bg_col_ansi = bg_col_ansi;
-			screen[offset + i].bg_rgb      = bg_rgb;
-			screen[offset + i].attr        = attr;
+			screen[offset].c           = ' ';
+			screen[offset].fg_col_ansi = fg_col_ansi;
+			screen[offset].fg_rgb      = fg_rgb;
+			screen[offset].bg_col_ansi = bg_col_ansi;
+			screen[offset].bg_rgb      = bg_rgb;
+			screen[offset].attr        = attr;
+			if (offset++ >= max_offset)
+				break;
 		}
 	}
 	else if (cmd == 'Y') {  // vertical tab, CVT
@@ -948,7 +958,7 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 		else if (in[i] == 11) {  // ^K, vtab
 			DLD("VTAB");
 
-			while(y < h) {
+			while(y < h - 1) {
 				y++;
 
 				if (v_tab_stops.at(y))

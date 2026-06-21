@@ -380,7 +380,6 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 
 	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
 
-	bool  telnet_recv = false;
 	int   telnet_left = 0;
 	bool  telnet_sb   = false;
 
@@ -428,7 +427,6 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			if (client_fd != -1) {
 				close(client_fd);
 
-				telnet_recv = false;
 				telnet_left = 0;
 				telnet_sb   = false;
 			}
@@ -477,7 +475,6 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 					}
 
 					if (c == 0xff) {
-						telnet_recv = true;
 						telnet_left = 2;
 					}
 					else if (ignore_keypresses == false)  {
@@ -485,7 +482,6 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 							continue;
 
 						if (WRITE(program_fd, &c, 1) != 1) {
-							assert(telnet_recv == false);
 							assert(telnet_left == 0);
 
 							if (client_fd != -1)  {
