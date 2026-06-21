@@ -502,8 +502,12 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	std::optional<int> par1;
 	std::optional<int> par2;
 
-	if (pars.size() >= 1)
-		par1 = std::stoi(pars[0]);
+	if (pars.size() >= 1 && pars[0].size() >= 1) {
+		if (pars[0][0] == '?')
+			par1 = std::stoi(pars[0].substr(1));
+		else
+			par1 = std::stoi(pars[0]);
+	}
 
 	if (pars.size() >= 2)
 		par2 = std::stoi(pars[1]);
