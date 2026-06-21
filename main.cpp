@@ -708,7 +708,10 @@ int main(int argc, char *argv[])
 		server_parameters.max_wait          = minimum_fps > 0 ? 1000 / minimum_fps : 0;
 
 		httpd *s_h = { nullptr };
-		httpd *h   = start_http_server(http_bind, http_port, &server_parameters, { });
+		httpd *h   = { nullptr };
+
+		if (http_port != 0)
+			h = start_http_server(http_bind, http_port, &server_parameters, { });
 
 		if (https_port != 0) {
 			if (https_cert.empty())
@@ -749,7 +752,8 @@ int main(int argc, char *argv[])
 		if (s_h)
 			stop_http_server(s_h);
 
-		stop_http_server(h);
+		if (h)
+			stop_http_server(h);
 
 		wolfSSL_Cleanup();
 	}

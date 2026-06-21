@@ -44,6 +44,7 @@ ignore-keypresses: false
 telnet-workarounds: true
 
 http-addr: 127.0.0.1
+# set to 0 to disable
 http-port: 8080
 
 # set https-port to a non-0 value if you want to enable
