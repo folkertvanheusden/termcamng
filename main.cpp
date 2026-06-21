@@ -594,6 +594,7 @@ int main(int argc, char *argv[])
 		const int compression_level   = yaml_get_int(config,    "compression-level", "value between 0 (no compression) and 100 (max.)");
 
 		const int vnc_port            = yaml_get_int(config,    "vnc-port",     "VNC port to listen on (0 to disable)");
+		const bool vnc_allow_keyboard = yaml_get_bool(config,   "vnc-allow-keyboard", "Wether to allow the client to interact with the terminal session");
 
 		const std::string telnet_bind = yaml_get_string(config, "telnet-addr",  "network interface (IP address) to let the telnet port bind to");
 		const int telnet_port         = yaml_get_int(config,    "telnet-port",  "telnet port to listen on (0 to disable)");
@@ -663,7 +664,7 @@ int main(int argc, char *argv[])
 
 		VNCServer *vnc { nullptr };
 		if (vnc_port != 0) {
-			vnc = new VNCServer(&t, vnc_port, program_fd);
+			vnc = new VNCServer(&t, vnc_port, vnc_allow_keyboard, program_fd);
 			vnc->begin();
 		}
 

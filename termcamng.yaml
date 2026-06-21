@@ -25,6 +25,7 @@ telnet-port: 2300
 
 # set to 0 to disable
 vnc-port: 5901
+vnc-allow-keyboard: true
 
 # either ansi or xterm
 terminal-type: xterm-256color
