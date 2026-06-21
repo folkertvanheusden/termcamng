@@ -1195,6 +1195,16 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 			}
 		}
 	}
+
+	// cursor
+	for(int cy=0; cy<char_h; cy++) {
+		for(int cx=0; cx<char_w; cx++) {
+			int offset = y * *out_w * char_h * 3 + cy * *out_w * 3 + x * char_w * 3 + cx * 3;
+			(*out)[offset + 0] ^= 255;
+			(*out)[offset + 1] ^= 255;
+			(*out)[offset + 2] ^= 255;
+		}
+	}
 }
 
 char terminal::get_char_at(const int cx, const int cy) const
