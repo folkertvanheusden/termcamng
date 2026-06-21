@@ -56,7 +56,7 @@ void VNCServer::VNCClientServerInit(int fd)
 	int      height = 0;
 	uint8_t *dummy = nullptr;
 	t->render(&dummy, &width, &height);
-	delete [] dummy;
+	free(dummy);
 
 	uint8_t reply[24] { };
 	reply[0] = width >> 8;
@@ -200,7 +200,7 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 
 	if (WRITE(fd, update, sizeof update) != sizeof update) {
 		dolog(ll_info, "VNC: failed transmitting header");
-		delete [] pixels;
+		free(pixels);
 		return false;
 	}
 
@@ -212,7 +212,7 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 		temp[out_off + 1] = pixels[in_off + 1];
 		temp[out_off + 0] = pixels[in_off + 2];
 	}
-	delete [] pixels;
+	free(pixels);
 
 	if (WRITE(fd, temp, w * h * 4) != w * h * 4) {
 		dolog(ll_info, "VNC: failed transmitting payload");
