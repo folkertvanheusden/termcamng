@@ -51,23 +51,27 @@ std::string generate_initial_screen(terminal *const t)
 
 	int w = t->get_width();
 	int h = t->get_height();
-
+	int pfg = -1;
+	int pbg = -1;
 	for(int y=0; y<h; y++) {
 		bool last_line = y == h - 1;
-
 		int  cur_w     = last_line ? w - 1 : w;
 
 		out += myformat("\033[%dH", y + 1);
-
 		for(int x=0; x<cur_w; x++) {
 			pos_t c = t->get_cell_at(x, y);
-
-			out += myformat("\033[%d;%dm%c", c.fg_col_ansi, c.bg_col_ansi, c.c ? c.c : ' ');
+			if (pfg != c.fg_col_ansi || pbg != c.bg_col_ansi) {
+				out += myformat("\033[%d;%dm%c", 30 + c.fg_col_ansi, 40 + c.bg_col_ansi, c.c ? c.c : ' ');
+				pfg = c.fg_col_ansi;
+				pbg = c.bg_col_ansi;
+			}
+			else {
+				out += c.c ? c.c : ' ';
+			}
 		}
 	}
 
 	auto cursor_location = t->get_current_xy();
-
 	out += myformat("\033[%d;%dH", cursor_location.second + 1, cursor_location.first + 1);
 
 	return out;
@@ -99,7 +103,6 @@ std::string setup_telnet_session()
 int function_conversation(int num_msg, const struct pam_message **msg, struct pam_response **resp, void *appdata_ptr)
 {
 	pam_response *reply = (pam_response *)appdata_ptr;
-
 	*resp = reply;
 
 	return PAM_SUCCESS;
@@ -282,9 +285,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 					lck.unlock();
 
 					std::string setup   = setup_telnet_session();
-
 					std::string data    = generate_initial_screen(t);
-
 					std::string initial = setup + data;
 
 					ssh_channel_write(channel, initial.c_str(), initial.size());
@@ -420,9 +421,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			dolog(ll_info, "process_telnet: connected with %s", get_endpoint_name(client_fd).c_str());
 
 			std::string setup   = setup_telnet_session();
-
 			std::string data    = generate_initial_screen(t);
-
 			std::string initial = setup + data;
 
 			if (size_t(WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size())) != initial.size()) {
