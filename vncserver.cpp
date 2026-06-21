@@ -111,6 +111,7 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 		if (rc == -1)
 			return false;
 
+		// quickly go through all pending messages
 		wait = 0;
 
 		uint8_t type_ = 0;
@@ -139,7 +140,7 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
 				return false;
 			// TODO
-			return true;
+			return true;  // client wants an update, do so asap
 		}
 		else if (type_ == 4) {  // KeyEvent
 			uint8_t buffer[7];
