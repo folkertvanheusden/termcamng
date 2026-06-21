@@ -1173,10 +1173,10 @@ void terminal::render(uint8_t **const out, int *const out_w, int *const out_h)
 		blink_switch_ts = latest_update;
 	}
 
-	const int char_w    = f->get_width();
-	const int char_h    = f->get_height();
+	const int char_w   = f->get_width ();
+	const int char_h   = f->get_height();
 
-	int pixels_per_row  = w * char_w;
+	int pixels_per_row = w * char_w;
 
 	*out_w = pixels_per_row;
 	*out_h = h * char_h;
@@ -1285,4 +1285,13 @@ void terminal::erase_line(const int cy)
 {
 	for(int cx=0; cx<w; cx++)
 		erase_cell(cx, cy);
+}
+
+void terminal::get_dimensions(int *const out_w, int *const out_h)
+{
+	const int char_w = f->get_width ();
+	const int char_h = f->get_height();
+
+	*out_w = w * char_w;
+	*out_h = h * char_h;
 }

@@ -52,11 +52,9 @@ void VNCServer::VNCClientServerInit(int fd)
 	uint8_t shared = 0;
 	READ(fd, &shared, 1);
 
-	int      width  = 0;
-	int      height = 0;
-	uint8_t *dummy = nullptr;
-	t->render(&dummy, &width, &height);
-	free(dummy);
+	int     width  = 0;
+	int     height = 0;
+	t->get_dimensions(&width, &height);
 
 	uint8_t reply[24] { };
 	reply[0] = width >> 8;
@@ -235,7 +233,7 @@ void VNCServer::VNCClientThread(int fd)
 	client_state cs { };
 	bool         first    = true;
 	while(!stop_flag) {
-		if (t->wait_for_frame(&ts_after, 10)) {
+		if (first || t->wait_for_frame(&ts_after, 10)) {
 			if (VNCSendFrame(fd, first) == false)
 				break;
 			first = false;
