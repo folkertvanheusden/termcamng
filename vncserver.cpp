@@ -235,7 +235,8 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 	}
 	free(pixels);
 
-	if (WRITE(fd, temp, w * h * 4) != w * h * 4) {
+	size_t n_bytes = w * h * 4;
+	if (WRITE(fd, temp, n_bytes) != n_bytes) {
 		dolog(ll_info, "VNC: failed transmitting payload");
 		delete [] temp;
 		return false;
