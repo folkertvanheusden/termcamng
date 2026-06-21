@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
-#include <stdlib.h>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -680,18 +682,18 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 			dolog(ll_info, "%s %c not supported", parameters.c_str(), cmd);
 	}
 	else if (cmd == 'S') {
-		int n = pars.size() == 1 ? std::stoi(pars[0]) : 1;
+		int n = std::min(h, pars.size() == 1 ? std::stoi(pars[0]) : 1);
 		DLD("CSI S (%d)", n);
 		for(int i=0; i<n; i++)
 			scroll_up();
 	}
 	else if (cmd == 'r') {  // scrolling region
 		if (pars.size() == 1 || pars.size() == 2) {
-			scroll_region.first = std::max(0, std::stoi(pars[0]) - 1);
+			scroll_region.first = std::clamp(std::stoi(pars[0]) - 1, 0, h - 1);
 			scroll_region.second = h;
 		}
 		if (pars.size() == 2)
-			scroll_region.second = std::max(0, std::stoi(pars[1]) - 1);
+			scroll_region.second = std::clamp(std::stoi(pars[1]) - 1, 0, h);
 		if (pars.empty())
 			scroll_region = { 0, h - 1 };
 		DLD("CSI r (%d,%d)", scroll_region.first + 1, scroll_region.second + 1);
@@ -902,8 +904,8 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 		}
 		else {
 			DLD("CSI g");
-
-			h_tab_stops.at(x) = false;
+			if (x < w && x >= 0)
+				h_tab_stops.at(x) = false;
 		}
 	}
 	else {
@@ -921,168 +923,176 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 {
 	std::optional<std::string> send_back;
 
-	for(size_t i=0; i<len; i++) {
-		if (g0)
-			g0 = false;
-		// C0
-		else if (in[i] == 13) {  // carriage return
-			DLD("CR");
-			x = 0, utf8_len = 0;
-		}
-		else if (in[i] == 10) {  // new line
-			DLD("NL");
-			if (y == scroll_region.second)
-				scroll_up();
-			else
-				y++;
-			utf8_len = 0;
-		}
-		else if (in[i] == 8) {  // backspace
-			DLD("backspace");
+	try {
+		for(size_t i=0; i<len; i++) {
+			if (g0)
+				g0 = false;
+			// C0
+			else if (in[i] == 13) {  // carriage return
+				DLD("CR");
+				x = 0, utf8_len = 0;
+			}
+			else if (in[i] == 10) {  // new line
+				DLD("NL");
+				if (y == scroll_region.second)
+					scroll_up();
+				else
+					y++;
+				utf8_len = 0;
+			}
+			else if (in[i] == 8) {  // backspace
+				DLD("backspace");
 
-			if (x)
-				x--;
-			else if (y)
-				x = 0, y--;
+				if (x)
+					x--;
+				else if (y)
+					x = 0, y--;
 
-			utf8_len = 0;
-		}
-		else if (in[i] == 9) {  // tab
-			DLD("TAB");
+				utf8_len = 0;
+			}
+			else if (in[i] == 9) {  // tab
+				DLD("TAB");
 
-			while(x < w && h_tab_stops.at(x) == false)
-				x++;
+				while(x < w && h_tab_stops.at(x) == false)
+					x++;
 
-			utf8_len = 0;
-		}
-		else if (in[i] == 11) {  // ^K, vtab
-			DLD("VTAB");
+				utf8_len = 0;
+			}
+			else if (in[i] == 11) {  // ^K, vtab
+				DLD("VTAB");
 
-			while(y < h - 1) {
-				y++;
+				while(y < h - 1) {
+					y++;
 
-				if (v_tab_stops.at(y))
-					break;
+					if (v_tab_stops.at(y))
+						break;
+				}
+
+				if (y >= h)
+					y = h - 1;
+			}
+			// Fe
+			else if (escape == true) {
+				if (in[i] == 27) {  // escape in an escape, should be DCS or OSC
+					escape_type = ET_NONE;
+					escape_value.clear();
+				}
+				else if (escape_type == ET_NONE) {
+					if (in[i] == 'D' || in[i] == 'E') {  // IND index / NEL next line
+						DLD("ESC %c", in[i]);
+						do_next_line(in[i] == 'E', true, 1);  // x=0 and scroll, 1 line
+					}
+					else if (in[i] == 'M') {  // RI, reverse index
+						DLD("ESC M");
+						do_prev_line(false, true, 1);
+					}
+					else if (in[i] == 'P') {  // DCS, terminated by ST
+						DLD("ESC P");
+						escape_type = ET_DCS;
+					}
+					else if (in[i] == '[')  // constrol sequence introduceer, "Starts most of the useful sequences, terminated by a byte in the range 0x40 through 0x7E"
+						escape_type = ET_CSI;
+					else if (in[i] == '\\') { // ST
+						DLD("ESC \\");
+						escape_type = ET_NONE;
+						escape = false;
+					}
+					else if (in[i] == ']') {  // OSC
+						DLD("ESC ]");
+						escape_type = ET_OSC;
+					}
+					else if (in[i] == 'H') {  // HTS, horizontal tab set
+						DLD("HTS");
+						h_tab_stops.at(x) = true;
+					}
+					else if (in[i] == 'J') {  // VTS, vertical tab set
+						DLD("VTS");
+						v_tab_stops.at(y) = true;
+					}
+					else if (in[i] == '(')
+						g0 = true;
+					else if (in[i] == '7') {
+						save_x = x;
+						save_y = y;
+					}
+					else if (in[i] == '8') {
+						x = save_x;
+						y = save_y;
+					}
+					else {
+						emit_character(in[i]);
+
+						dolog(ll_info, "Escape Fe %c not supported, parameters: <%s>", in[i], escape_value.c_str());
+
+						escape = false;
+					}
+				}
+				else if (escape_type == ET_DCS) {
+				}
+				else if (escape_type == ET_CSI) {
+					if (in[i] >= 0x40 && in[i] <= 0x7e) {
+						send_back = process_escape_CSI(in[i], escape_value);
+
+						escape = false;
+					}
+					else {
+						escape_value += in[i];
+					}
+				}
+			}
+			else if (in[i] == 27) {
+				escape = true;
+				escape_type = ET_NONE;
+				escape_value.clear();
+
+				utf8_len = 0;
+			}
+			// "regular" text
+			else {
+				uint32_t c = uint32_t(-1);
+
+				if (utf8_len) {
+					utf8_code <<= 6;
+					utf8_code |= in[i] & 63;
+
+					utf8_len--;
+
+					if (utf8_len == 0)
+						c = utf8_code;
+				}
+				else if ((in[i] & 0xe0) == 0xc0) {
+					utf8_code = in[i] & 31;
+					utf8_len = 1;
+				}
+				else if ((in[i] & 0xf0) == 0xe0) {
+					utf8_code = in[i] & 15;
+					utf8_len = 2;
+				}
+				else if ((in[i] & 0xf8) == 0xf0) {
+					utf8_code = in[i] & 7;
+					utf8_len = 3;
+				}
+				else {
+					c = in[i];
+				}
+
+				if (c != uint32_t(-1)) {
+					DLD("CHAR: %c", c);
+
+					emit_character(c);
+				}
 			}
 
 			if (y >= h)
 				y = h - 1;
 		}
-		// Fe
-		else if (escape == true) {
-			if (in[i] == 27) {  // escape in an escape, should be DCS or OSC
-				escape_type = ET_NONE;
-				escape_value.clear();
-			}
-			else if (escape_type == ET_NONE) {
-				if (in[i] == 'D' || in[i] == 'E') {  // IND index / NEL next line
-					DLD("ESC %c", in[i]);
-					do_next_line(in[i] == 'E', true, 1);  // x=0 and scroll, 1 line
-				}
-				else if (in[i] == 'M') {  // RI, reverse index
-					DLD("ESC M");
-					do_prev_line(false, true, 1);
-				}
-				else if (in[i] == 'P') {  // DCS, terminated by ST
-					DLD("ESC P");
-					escape_type = ET_DCS;
-				}
-				else if (in[i] == '[')  // constrol sequence introduceer, "Starts most of the useful sequences, terminated by a byte in the range 0x40 through 0x7E"
-					escape_type = ET_CSI;
-				else if (in[i] == '\\') { // ST
-					DLD("ESC \\");
-					escape_type = ET_NONE;
-					escape = false;
-				}
-				else if (in[i] == ']') {  // OSC
-					DLD("ESC ]");
-					escape_type = ET_OSC;
-				}
-				else if (in[i] == 'H') {  // HTS, horizontal tab set
-					DLD("HTS");
-					h_tab_stops.at(x) = true;
-				}
-				else if (in[i] == 'J') {  // VTS, vertical tab set
-					DLD("VTS");
-					v_tab_stops.at(y) = true;
-				}
-				else if (in[i] == '(')
-					g0 = true;
-				else if (in[i] == '7') {
-					save_x = x;
-					save_y = y;
-				}
-				else if (in[i] == '8') {
-					x = save_x;
-					y = save_y;
-				}
-				else {
-					emit_character(in[i]);
-
-					dolog(ll_info, "Escape Fe %c not supported, parameters: <%s>", in[i], escape_value.c_str());
-
-					escape = false;
-				}
-			}
-			else if (escape_type == ET_DCS) {
-			}
-			else if (escape_type == ET_CSI) {
-				if (in[i] >= 0x40 && in[i] <= 0x7e) {
-					send_back = process_escape_CSI(in[i], escape_value);
-
-					escape = false;
-				}
-				else {
-					escape_value += in[i];
-				}
-			}
-		}
-		else if (in[i] == 27) {
-			escape = true;
-			escape_type = ET_NONE;
-			escape_value.clear();
-
-			utf8_len = 0;
-		}
-		// "regular" text
-		else {
-			uint32_t c = uint32_t(-1);
-
-			if (utf8_len) {
-				utf8_code <<= 6;
-				utf8_code |= in[i] & 63;
-
-				utf8_len--;
-
-				if (utf8_len == 0)
-					c = utf8_code;
-			}
-			else if ((in[i] & 0xe0) == 0xc0) {
-				utf8_code = in[i] & 31;
-				utf8_len = 1;
-			}
-			else if ((in[i] & 0xf0) == 0xe0) {
-				utf8_code = in[i] & 15;
-				utf8_len = 2;
-			}
-			else if ((in[i] & 0xf8) == 0xf0) {
-				utf8_code = in[i] & 7;
-				utf8_len = 3;
-			}
-			else {
-				c = in[i];
-			}
-
-			if (c != uint32_t(-1)) {
-				DLD("CHAR: %c", c);
-
-				emit_character(c);
-			}
-		}
-
-		if (y >= h)
-			y = h - 1;
 	}
+	catch(std::invalid_argument const & ex) {
+		dolog(ll_info, "Stream produced an \"invalid argument\" exception (%s)", ex.what());
+	}
+        catch (const std::out_of_range & ex) {
+		dolog(ll_info, "Stream produced an \"out of range\" exception (%s)", ex.what());
+        }
 
 	std::unique_lock<std::mutex> lck(lock);
 	latest_update = get_ms();
