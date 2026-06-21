@@ -67,6 +67,7 @@ ssh-keys: /etc/ssh
 #exec-command: /usr/bin/httping -Q -K 192.168.64.100
 exec-command: /usr/bin/htop -d 5
 #exec-command: /usr/bin/btop
+# set work directory to this path before invoking the 'exec-command'
 directory: /tmp
 # how long to wait (in seconds) before restarting the exec-command when it has stopped
 # set to -1 to disable this
