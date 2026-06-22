@@ -16,8 +16,7 @@ FT_Library font::library;
 std::mutex freetype2_lock;
 std::mutex fontconfig_lock;
 
-font::font(const std::vector<std::string> & font_files, std::optional<int> font_width_in, const int font_height) :
-	font_height(font_height)
+font::font(const std::vector<std::string> & font_files, std::optional<int> font_width_in, const int font_height_in)
 {
 	FT_Init_FreeType(&font::library);
 
@@ -33,7 +32,7 @@ font::font(const std::vector<std::string> & font_files, std::optional<int> font_
 
 		FT_Select_Charmap(face, ft_encoding_unicode);
 
-		if (FT_Set_Char_Size(face, font_width_in.has_value() ? font_width_in.value() * 64 : 0, font_height * 64, 72, 72))
+		if (FT_Set_Char_Size(face, font_width_in.has_value() ? font_width_in.value() * 64 : 0, font_height_in * 64, 72, 72))
 			FT_Select_Size(face, 0);
 
 		faces.push_back(face);
@@ -44,18 +43,20 @@ font::font(const std::vector<std::string> & font_files, std::optional<int> font_
 
 	// font '0' (first font) must contain all basic characters
 	// determine dimensions of character set
-	int temp_width  = 0;
+	int temp_width    = 0;
+	int max_descender = 0;
 	for(UChar32 c = 33; c < 127; c++) {
 		int glyph_index = FT_Get_Char_Index(faces.at(0), c);
 
 		if (FT_Load_Glyph(faces.at(0), glyph_index, FT_LOAD_NO_BITMAP | FT_LOAD_COLOR) == 0) {
-			temp_width   = std::max(temp_width  , int(faces.at(0)->glyph->metrics.horiAdvance) / 64);  // width should be all the same!
-			max_ascender = std::max(max_ascender, int(faces.at(0)->glyph->metrics.horiBearingY));
+			auto face = faces.at(0);
+			temp_width    = std::max(temp_width, int(face->glyph->metrics.horiAdvance) / 64);  // width should be all the same!
+			max_ascender  = std::max(max_ascender, int(face->glyph->metrics.horiBearingY));
+			max_descender = std::max(max_descender, int(face->glyph->metrics.height - face->glyph->metrics.horiBearingY));
 		}
 	}
 
-	if (this->font_height == 0)
-		this->font_height = max_ascender / 64;
+	font_height = (max_ascender + max_descender) / 64;
 
 	if (font_width_in.has_value() == false)
 		font_width = temp_width;
@@ -350,7 +351,6 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 		delete [] work;
 	}
 	else {
-
 		int work_dest_x = dest_x + glyph->horiBearingX / 64;
 		int use_width   = std::min(dest_width  - work_dest_x, result_width);
 		int work_dest_y = dest_y + max_ascender / 64.0 - glyph->bitmap_top;
@@ -358,7 +358,6 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 
 		for(int y=0; y<use_height; y++) {
 			int temp = work_dest_y + y;
-
 			if (temp >= 0)
 				memcpy(&dest[temp * dest_width * 3 + work_dest_x * 3], &result[result_width * y * 3], use_width * 3);
 		}

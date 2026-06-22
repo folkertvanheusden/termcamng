@@ -52,7 +52,7 @@ protected:
 	void draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_Int x, const FT_Int y, const rgb_t & fg, const rgb_t & bg, const bool has_color, const intensity_t i, const bool invert, const bool underline, const bool strikethrough, uint8_t *const dest, const int dest_width, const int dest_height);
 
 public:
-	font(const std::vector<std::string> & font_files, std::optional<int> font_width, const int font_height);
+	font(const std::vector<std::string> & font_files, std::optional<int> font_width, const int font_height_in);
 	virtual ~font();
 
 	int  get_width() const;
