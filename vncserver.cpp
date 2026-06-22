@@ -19,13 +19,13 @@
 bool VNCServer::VNCSendVersion(int fd)
 {
 	const char msg[] = "RFB 003.008\n";
-	if (WRITE(fd, reinterpret_cast<const uint8_t *>(msg), strlen(msg)) != strlen(msg))
+	if (WRITE(fd, reinterpret_cast<const uint8_t *>(msg), strlen(msg)) == false)
 		return false;
 
 	// wait for reply, ignoring what it is
 	for(;;) {
 		char buffer = 0;
-		if (READ(fd, reinterpret_cast<uint8_t *>(&buffer), 1) != 1)
+		if (READ(fd, reinterpret_cast<uint8_t *>(&buffer), 1) == false)
 			return false;
 		if (buffer == '\n')
 			break;
@@ -37,16 +37,16 @@ bool VNCServer::VNCSendVersion(int fd)
 bool VNCServer::VNCSecurityHandshake(int fd)
 {
 	uint8_t list[] { 1, 1 };  // 1, None
-	if (WRITE(fd, list, sizeof list) != sizeof list)
+	if (WRITE(fd, list, sizeof list) == false)
 		return false;
 
 	// receive reply with choice, ignoring choice
 	char buffer = 0;
-	if (READ(fd, reinterpret_cast<uint8_t *>(&buffer), 1) != 1)
+	if (READ(fd, reinterpret_cast<uint8_t *>(&buffer), 1) == false)
 		return false;
 
 	uint8_t reply[4] { };
-	if (WRITE(fd, reply, sizeof reply) != sizeof reply)
+	if (WRITE(fd, reply, sizeof reply) == false)
 		return false;
 
 	dolog(ll_debug, "VNC: end of SecurityHandshake");
@@ -57,7 +57,7 @@ bool VNCServer::VNCSecurityHandshake(int fd)
 bool VNCServer::VNCClientServerInit(int fd)
 {
 	uint8_t shared = 0;
-	if (READ(fd, &shared, 1) != 1)
+	if (READ(fd, &shared, 1) == false)
 		return false;
 
 	int     width  = 0;
@@ -89,9 +89,9 @@ bool VNCServer::VNCClientServerInit(int fd)
 	reply[21] = (name_len >> 16) & 255;
 	reply[22] = (name_len >>  8) & 255;
 	reply[23] = name_len & 255;
-	if (WRITE(fd, reply, 24) != 24)
+	if (WRITE(fd, reply, 24) == false)
 		return false;
-	if (WRITE(fd, reinterpret_cast<const uint8_t *>(name), name_len) != name_len)
+	if (WRITE(fd, reinterpret_cast<const uint8_t *>(name), name_len) == false)
 		return false;
 
 	dolog(ll_debug, "VNC: end of ClientServerInit");
@@ -115,36 +115,36 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 		wait = 0;
 
 		uint8_t type_ = 0;
-		if (READ(fd, &type_, 1) != 1)
+		if (READ(fd, &type_, 1) == false)
 			return false;
 
 		if (type_ == 0) {  // SetPixelFormat
 			uint8_t buffer[3 + 16];
-			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 		}
 		else if (type_ == 2) {  // SetEncodings
 			uint8_t buffer[3];
-			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 
 			int no_encodings = (buffer[1] << 8) | buffer[2];
 			for(int i=0; i<no_encodings; i++) {
 				uint8_t temp[4];
-				if (READ(fd, temp, sizeof temp) != sizeof temp)
+				if (READ(fd, temp, sizeof temp) == false)
 					return false;
 			}
 		}
 		else if (type_ == 3) {  // FramebufferUpdateRequest
 			uint8_t buffer[9];
-			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 			// TODO
 			return true;  // client wants an update, do so asap
 		}
 		else if (type_ == 4) {  // KeyEvent
 			uint8_t buffer[7];
-			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 			if (vnc_allow_keyboard) {
 				bool down = buffer[0];
@@ -153,17 +153,17 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 				if (down) {
 					if (vnc_scan_code < 0x80) {  // regular ascii
 						uint8_t buffer = cs->ctrl_pressed ? toupper(vnc_scan_code) - 'A' + 1 : vnc_scan_code;
-						if (WRITE(stdin_fd, &buffer, 1) != 1)
+						if (WRITE(stdin_fd, &buffer, 1) == false)
 							return false;
 					}
 					else if (vnc_scan_code == 65293) {  // enter
 						uint8_t buffer[] = { 13, 10 };
-						if (WRITE(stdin_fd, buffer, sizeof buffer) != sizeof buffer)
+						if (WRITE(stdin_fd, buffer, sizeof buffer) == false)
 							return false;
 					}
 					else if (vnc_scan_code == 65288) {  // backspace
 						uint8_t buffer = 8;
-						if (WRITE(stdin_fd, &buffer, 1) != 1)
+						if (WRITE(stdin_fd, &buffer, 1) == false)
 							return false;
 					}
 				}
@@ -173,17 +173,17 @@ bool VNCServer::VNCWaitForEvent(int fd, client_state *const cs)
 		}
 		else if (type_ == 5) {  // PointerEvent
 			uint8_t buffer[5];
-			if (READ(fd, buffer, sizeof buffer) != 5)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 		}
 		else if (type_ == 6) {  // ClientCutText
 			uint8_t buffer[7];
-			if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+			if (READ(fd, buffer, sizeof buffer) == false)
 				return false;
 			uint32_t n_to_read = (buffer[3] << 24) | (buffer[4] << 16) | (buffer[5] << 8) | buffer[6];
 			for(uint32_t i=0; i<n_to_read; i++) {
 				uint8_t buffer[1];
-				if (READ(fd, buffer, sizeof buffer) != sizeof buffer)
+				if (READ(fd, buffer, sizeof buffer) == false)
 					return false;
 			}
 		}
@@ -221,7 +221,7 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 	update[14] = 0;
 	update[15] = 0;
 
-	if (WRITE(fd, update, sizeof update) != sizeof update) {
+	if (WRITE(fd, update, sizeof update) == false) {
 		dolog(ll_info, "VNC: failed transmitting header");
 		free(pixels);
 		return false;
@@ -238,7 +238,7 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 	free(pixels);
 
 	size_t n_bytes = w * h * 4;
-	if (WRITE(fd, temp, n_bytes) != n_bytes) {
+	if (WRITE(fd, temp, n_bytes) == false) {
 		dolog(ll_info, "VNC: failed transmitting payload");
 		delete [] temp;
 		return false;

@@ -322,7 +322,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 						int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
 
 						if (i > 0 && ignore_keypresses == false) {
-							if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) != i)
+							if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(buffer), i) == false)
 								break;
 						}
 
@@ -394,7 +394,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 				std::string data    = generate_initial_screen(t);
 				std::string initial = setup + data;
 
-				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size()) != initial.size()) {
+				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size()) == false) {
 					close(client_fd);
 					return;
 				}
@@ -410,7 +410,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 						std::string data = client->queue.at(0);
 						client->queue.erase(client->queue.begin() + 0);
 
-						if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
+						if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) == false) {
 							close(client_fd);
 							break;
 						}
@@ -456,7 +456,7 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 							if (telnet_workarounds && c == 0)
 								continue;
 
-							if (WRITE(program_fd, &c, 1) != 1) {
+							if (WRITE(program_fd, &c, 1) == false) {
 								assert(telnet_left == 0);
 
 								if (client_fd != -1)  {
@@ -508,7 +508,7 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 				auto send_back = t->process_input(buffer, rrc);
 
 				if (send_back.has_value()) {
-					if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(send_back.value().c_str()), send_back.value().size()) != ssize_t(send_back.value().size())) {
+					if (WRITE(program_fd, reinterpret_cast<const uint8_t *>(send_back.value().c_str()), send_back.value().size()) == false) {
 						dolog(ll_warning, "read_and_distribute_program: problem responding to program %s", rrc ? strerror(errno) : "");
 						break;
 					}
