@@ -16,7 +16,8 @@ FT_Library font::library;
 std::mutex freetype2_lock;
 std::mutex fontconfig_lock;
 
-font::font(const std::vector<std::string> & font_files, std::optional<int> font_width_in, const int font_height) : font_height(font_height)
+font::font(const std::vector<std::string> & font_files, std::optional<int> font_width_in, const int font_height) :
+	font_height(font_height)
 {
 	FT_Init_FreeType(&font::library);
 
@@ -116,13 +117,12 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 
 				for(int xbit=0; xbit < 8; xbit++) {
 					int pixel_v = b & 128 ? max1 : 0;
-
 					b <<= 1;
 
-					if (invert)
-						pixel_v = max1 - pixel_v;
-
 					int sub = max1 - pixel_v;
+
+					if (invert)
+						pixel_v = sub;
 
 					if (screen_buffer_offset >= 0) {
 						(*result)[screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
@@ -151,10 +151,10 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 
 				int pixel_v = (bitmap->buffer[io] * max) >> 8;
 
-				if (invert)
-					pixel_v = max1 - pixel_v;
-
 				int sub = max1 - pixel_v;
+
+				if (invert)
+					pixel_v = sub;
 
 				(*result)[local_screen_buffer_offset + 0] = (pixel_v * fg.r + sub * bg.r) >> 8;
 				(*result)[local_screen_buffer_offset + 1] = (pixel_v * fg.g + sub * bg.g) >> 8;
@@ -249,22 +249,28 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 	}
 
 	if (strikethrough) {
-		const int middle_line = *result_height / 2;
-		const int offset      = middle_line * *result_width * 3;
+		const int     middle_line = *result_height / 2;
+		const int     offset      = middle_line * *result_width * 3;
+		const uint8_t r           = (max * fg.r) >> 8;
+		const uint8_t g           = (max * fg.g) >> 8;
+		const uint8_t b           = (max * fg.b) >> 8;
 
 		for(int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_buffer_offset = offset + glyph_x * 3;
 
 			if (screen_buffer_offset >= 0) {
-				(*result)[screen_buffer_offset + 0] = (max * fg.r) >> 8;
-				(*result)[screen_buffer_offset + 1] = (max * fg.g) >> 8;
-				(*result)[screen_buffer_offset + 2] = (max * fg.b) >> 8;
+				(*result)[screen_buffer_offset + 0] = r;
+				(*result)[screen_buffer_offset + 1] = g;
+				(*result)[screen_buffer_offset + 2] = b;
 			}
 		}
 	}
 
 	if (underline) {
-		int pixel_v = invert ? 0 : max1;
+		int           pixel_v = invert ? 0 : max1;
+		const uint8_t r       = (max * fg.r) >> 8;
+		const uint8_t g       = (max * fg.g) >> 8;
+		const uint8_t b       = (max * fg.b) >> 8;
 
 		for(int glyph_x=0; glyph_x<*result_width; glyph_x++) {
 			int screen_x = glyph_x;
@@ -274,9 +280,9 @@ void font::draw_glyph_bitmap_low(const FT_Bitmap *const bitmap, const rgb_t & fg
 
 			int screen_buffer_offset = (*result_height - 2) * *result_width * 3 + screen_x * 3;
 
-			(*result)[screen_buffer_offset + 0] = (pixel_v * fg.r) >> 8;
-			(*result)[screen_buffer_offset + 1] = (pixel_v * fg.g) >> 8;
-			(*result)[screen_buffer_offset + 2] = (pixel_v * fg.b) >> 8;
+			(*result)[screen_buffer_offset + 0] = r;
+			(*result)[screen_buffer_offset + 1] = g;
+			(*result)[screen_buffer_offset + 2] = b;
 		}
 	}
 }
