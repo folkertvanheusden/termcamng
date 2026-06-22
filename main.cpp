@@ -214,6 +214,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 			int r = ssh_bind_accept_fd(sshbind, session, client_fd);
 			if (r == SSH_ERROR) {
 				dolog(ll_warning, "process_ssh: error accepting a connection: %s", ssh_get_error(sshbind));
+				close(client_fd);
 				ssh_disconnect(session);
 				ssh_free(session);
 				continue;
@@ -363,6 +364,8 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 	ssh_finalize();
 
 	printf("process_ssh: thread terminating\n");
+
+	close(server_fd);
 }
 
 void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool ignore_keypresses, clients_t *const clients, const bool telnet_workarounds)
@@ -476,6 +479,8 @@ void process_telnet(terminal *const t, const int program_fd, const int width, co
 			client.detach();
 		}
 	}
+
+	close(listen_fd);
 }
 
 void read_and_distribute_program(const int program_fd, terminal *const t, clients_t *const clients, const bool local_output)
