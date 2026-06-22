@@ -251,6 +251,8 @@ bool VNCServer::VNCSendFrame(int fd, bool first)
 
 void VNCServer::VNCClientThread(int fd)
 {
+	set_thread_name("vnc-client");
+
 	if (VNCSendVersion(fd) && VNCSecurityHandshake(fd) && VNCClientServerInit(fd)) {
 		uint64_t     ts_after = 0;
 		client_state cs { };
@@ -320,7 +322,7 @@ void VNCServer::operator()()
 		if (c == -1)
 			break;
 
-		dolog(ll_info, "VNC: incoming session accepted on fd %d", c);
+		dolog(ll_info, "VNC: incoming session accepted on fd %d, %s", c, get_endpoint_name(c).c_str());
 
 		clients.push_back(new std::thread(&VNCServer::VNCClientThread, this, c));
 	}
