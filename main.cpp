@@ -158,11 +158,25 @@ typedef struct
 	std::vector<std::string> queue;
 } client_t;
 
-typedef struct
+struct clients_t
 {
 	std::mutex                        lock;
 	std::map<std::string, client_t *> clients;
-} clients_t;
+
+	client_t * add_client(const std::string & name) {
+		std::unique_lock<std::mutex> lck(lock);
+		auto client = new client_t;
+		clients.insert({ name, client });
+		return client;
+	}
+
+	void delete_client(const std::string & name) {
+		std::unique_lock<std::mutex> lck(lock);
+		auto it = clients.find(name);
+		delete it->second;
+		clients.erase(it);
+	}
+};
 
 void process_ssh(terminal *const t, const std::string & ssh_keys, const std::string & bind_addr, const int port, const int program_fd, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients)
 {
@@ -294,13 +308,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 					set_thread_name("ssh-" + username);
 
 					std::string user_key = username + "_ssh_" + myformat("%d", ssh_get_fd(session));
-
-					std::unique_lock<std::mutex> lck(clients->lock);
-
-					client_t *client = new client_t();
-					auto it_client = clients->clients.insert({ user_key, client });
-
-					lck.unlock();
+					client_t *client = clients->add_client(user_key);
 
 					std::string setup   = setup_telnet_session();
 					std::string data    = generate_initial_screen(t);
@@ -311,7 +319,6 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 					while(!stop && !ssh_channel_is_eof(channel)) {
 						// read from ssh, transmit to terminal
 						char buffer[4096];
-
 						int i = ssh_channel_read_timeout(channel, buffer, sizeof buffer, 0, 50);
 
 						if (i > 0 && ignore_keypresses == false) {
@@ -322,11 +329,10 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 						// transmit any queued traffic
 						bool dumb_refresh = false;
 
-						std::unique_lock<std::mutex> lck(it_client.first->second->lock);
-						while(!it_client.first->second->queue.empty()) {
-							std::string data = it_client.first->second->queue.at(0);
-
-							it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
+						std::unique_lock<std::mutex> lck(client->lock);
+						while(!client->queue.empty()) {
+							std::string data = client->queue.at(0);
+							client->queue.erase(client->queue.begin() + 0);
 
 							if (!dumb_telnet)
 								ssh_channel_write(channel, data.c_str(), data.size());
@@ -347,11 +353,7 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 					ssh_free(session);
 
 					// unregister client from queues
-					lck.lock();
-
-					clients->clients.erase(user_key);
-
-					delete client;
+					clients->delete_client(user_key);
 			});
 
 			client_thread.detach();
@@ -363,138 +365,115 @@ void process_ssh(terminal *const t, const std::string & ssh_keys, const std::str
 	printf("process_ssh: thread terminating\n");
 }
 
-void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool dumb_telnet, const bool ignore_keypresses, clients_t *const clients, const bool telnet_workarounds)
+void process_telnet(terminal *const t, const int program_fd, const int width, const int height, const std::string & bind_to, const int listen_port, const bool ignore_keypresses, clients_t *const clients, const bool telnet_workarounds)
 {
-	int client_fd = -1;
-
 	// setup listening socket for viewers
 	int listen_fd = start_tcp_listen(bind_to, listen_port);
 
-	// only 1 telnet user concurrently currently
-	std::unique_lock<std::mutex> lck(clients->lock);
-
-	client_t *client = new client_t();
-	auto it_client = clients->clients.insert({ "_telnet_", client });
-
-	lck.unlock();
-
-	struct pollfd fds[] = { { listen_fd, POLLIN, 0 }, { -1, POLLIN, 0 } };
-
-	int   telnet_left = 0;
-	bool  telnet_sb   = false;
+	struct pollfd fds[] = { { listen_fd, POLLIN, 0 } };
 
 	while(!stop) {
-		int rc = poll(fds, client_fd != -1 ? 2 : 1, 100);
-
-		// transmit any queued traffic
-		bool dumb_refresh = false;
-
-		std::unique_lock<std::mutex> lck(it_client.first->second->lock);
-		while(!it_client.first->second->queue.empty()) {
-			std::string data = it_client.first->second->queue.at(0);
-
-			it_client.first->second->queue.erase(it_client.first->second->queue.begin() + 0);
-
-			dumb_refresh = true;
-
-			if (client_fd != -1 && dumb_telnet == false) {
-				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
-					close(client_fd);
-
-					client_fd = -1;
-				}
-			}
-		}
-
-		lck.unlock();
-
-		if (client_fd != -1 && dumb_refresh && dumb_telnet) {
-			std::string data = generate_initial_screen(t);
-
-			if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
-				close(client_fd);
-				client_fd = -1;
-			}
-		}
-
+		int rc = poll(fds, 1, 100);
 		if (rc == 0)
 			continue;
-
 		if (rc == -1)
-			error_exit(true, "process_telnet: poll failed");
+			break;
 
 		if (fds[0].revents) {
-			if (client_fd != -1) {
-				close(client_fd);
-
-				telnet_left = 0;
-				telnet_sb   = false;
-			}
-
-			client_fd = accept(listen_fd, nullptr, nullptr);
-			fds[1].fd = client_fd;
-
+			int client_fd = accept(listen_fd, nullptr, nullptr);
 			dolog(ll_info, "process_telnet: connected with %s", get_endpoint_name(client_fd).c_str());
 
-			std::string setup   = setup_telnet_session();
-			std::string data    = generate_initial_screen(t);
-			std::string initial = setup + data;
+			std::thread client([t, client_fd, program_fd, ignore_keypresses, telnet_workarounds, clients] {
+				std::string user_key = myformat("telnet_%d", client_fd);
+				set_thread_name(user_key);
 
-			if (size_t(WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size())) != initial.size()) {
-				close(client_fd);
-				client_fd = -1;
-			}
-		}
+				int   telnet_left = 0;
+				bool  telnet_sb   = false;
 
-		if (client_fd != -1 && fds[1].revents) {
-			char buffer[4096];
-			int  rc = read(client_fd, buffer, sizeof buffer);
+				std::string setup   = setup_telnet_session();
+				std::string data    = generate_initial_screen(t);
+				std::string initial = setup + data;
 
-			if (rc == -1 || rc == 0) {
-				close(client_fd);
-				client_fd = -1;
-			}
-			else {
-				for(int i=0; i<rc; i++) {
-					uint8_t c = buffer[i];
+				if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(initial.c_str()), initial.size()) != initial.size()) {
+					close(client_fd);
+					return;
+				}
 
-					if (telnet_left > 0 && telnet_sb == false) {
-						if (c == 250)  // SB
-							telnet_sb = true;
+				client_t *client = clients->add_client(user_key);
 
-						telnet_left--;
+				pollfd fds [] { { client_fd, POLLIN, 0 } };
 
+				while(!stop) {
+					// transmit any queued traffic
+					std::unique_lock<std::mutex> lck(client->lock);
+					while(!client->queue.empty()) {
+						std::string data = client->queue.at(0);
+						client->queue.erase(client->queue.begin() + 0);
+
+						if (WRITE(client_fd, reinterpret_cast<const uint8_t *>(data.c_str()), data.size()) != ssize_t(data.size())) {
+							close(client_fd);
+							break;
+						}
+					}
+					lck.unlock();
+
+					int rc = poll(fds, 1, 100);
+					if (rc == -1)
+						break;
+					if (rc == 0)
 						continue;
+
+					char buffer[4096];
+					int  rc_client = read(client_fd, buffer, sizeof buffer);
+					if (rc_client <= 0) {
+						close(client_fd);
+						break;
 					}
 
-					if (telnet_sb) {
-						if (c == 240)  // SE
-							telnet_sb = false;
+					for(int i=0; i<rc; i++) {
+						uint8_t c = buffer[i];
 
-						continue;
-					}
+						if (telnet_left > 0 && telnet_sb == false) {
+							if (c == 250)  // SB
+								telnet_sb = true;
 
-					if (c == 0xff) {
-						telnet_left = 2;
-					}
-					else if (ignore_keypresses == false)  {
-						if (telnet_workarounds && c == 0)
+							telnet_left--;
+
 							continue;
+						}
 
-						if (WRITE(program_fd, &c, 1) != 1) {
-							assert(telnet_left == 0);
+						if (telnet_sb) {
+							if (c == 240)  // SE
+								telnet_sb = false;
 
-							if (client_fd != -1)  {
-								close(client_fd);
+							continue;
+						}
 
-								client_fd = 1;
+						if (c == 0xff) {
+							telnet_left = 2;
+						}
+						else if (ignore_keypresses == false)  {
+							if (telnet_workarounds && c == 0)
+								continue;
+
+							if (WRITE(program_fd, &c, 1) != 1) {
+								assert(telnet_left == 0);
+
+								if (client_fd != -1)  {
+									close(client_fd);
+									break;
+								}
+
+								stop = true;  // program went away
 							}
-
-							stop = true;  // program went away
 						}
 					}
 				}
-			}
+
+				clients->delete_client(user_key);
+			});
+
+			client.detach();
 		}
 	}
 }
@@ -554,11 +533,9 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 				}
 #endif
 
-				std::lock_guard(clients->lock);
-
+				std::unique_lock<std::mutex> lck(clients->lock);
 				for(auto & client : clients->clients) {
-					std::lock_guard(client.second->lock);
-
+					std::unique_lock<std::mutex> lck_client(client.second->lock);
 					client.second->queue.push_back(data);
 				}
 			}
@@ -684,11 +661,11 @@ int main(int argc, char *argv[])
 
 		std::thread read_program([&clients, &t, program_fd, local_output] { read_and_distribute_program(program_fd, &t, &clients, local_output); });
 
-		std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients, telnet_workarounds] {
+		std::thread telnet_thread_handle([&t, program_fd, width, height, telnet_bind, telnet_port, ignore_keypresses, &clients, telnet_workarounds] {
 				set_thread_name("telnet");
 
 				if (telnet_port != 0)
-					process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, dumb_telnet, ignore_keypresses, &clients, telnet_workarounds);
+					process_telnet(&t, program_fd, width, height, telnet_bind, telnet_port, ignore_keypresses, &clients, telnet_workarounds);
 				});
 
 		std::thread ssh_thread_handle([&t, program_fd, ssh_keys, ssh_bind, ssh_port, dumb_telnet, ignore_keypresses, &clients] {
