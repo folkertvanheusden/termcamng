@@ -330,6 +330,7 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 		int work_dest_y = dest_y + max_ascender / 64.0 - scaled_bitmap_top;
 		int use_height  = std::min(dest_height - work_dest_y, font_height);
 
+		memset(dest, 0x00, font_width * use_height * 3);
 		for(int y=0; y<use_height; y++) {
 			int yo  = y * font_width;
 			int temp = y + work_dest_y;
@@ -342,11 +343,6 @@ void font::draw_glyph_bitmap(const glyph_cache_entry_t *const glyph, const FT_In
 					dest[o + 0] = work[i].r / work[i].n;
 					dest[o + 1] = work[i].g / work[i].n;
 					dest[o + 2] = work[i].b / work[i].n;
-				}
-				else {
-					dest[o + 0] =
-					dest[o + 1] =
-					dest[o + 2] = 0;
 				}
 			}
 		}
