@@ -33,7 +33,7 @@ font::font(const std::vector<std::string> & font_files, std::optional<int> font_
 
 		FT_Select_Charmap(face, ft_encoding_unicode);
 
-		if (FT_Set_Char_Size(face, font_width_in.has_value() ? font_width_in.value() * 64 : 0, (font_height - 1) * 64, 72, 72))
+		if (FT_Set_Char_Size(face, font_width_in.has_value() ? font_width_in.value() * 64 : 0, font_height * 64, 72, 72))
 			FT_Select_Size(face, 0);
 
 		faces.push_back(face);
