@@ -948,8 +948,18 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 	else if (cmd == 't') {  // XTWINOPTS
 		DLD("CSI t");
 		if (par1.has_value()) {
-			if (par1.value() == 19 || par1.value() == 18)
+			const int v = par1.value();
+			if (v == 19 /* screen size chars */|| v == 18 /* text area chars */)
 				send_back = myformat("\033[9;%d;%dt", h, w);
+			else if (v == 11 /* window state */)
+				send_back = myformat("\033[1t", h, w);  // de-iconified
+			else if (v == 13 /* window position */)
+				send_back = myformat("\033[3;0;0t");
+			else if (v == 15 /* display resolution in pixels */) {
+				const int char_w = f->get_width ();
+				const int char_h = f->get_height();
+				send_back = myformat("\033[5;0;0t", char_h * h, char_w * w);
+			}
 		}
 	}
 	else {
