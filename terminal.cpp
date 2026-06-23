@@ -493,7 +493,7 @@ void terminal::do_prev_line(const bool move_to_left, const bool do_scroll, const
 	}
 }
 
-std::optional<std::string> terminal::process_escape_CSI(const char cmd, const std::string & parameters)
+std::optional<std::string> terminal::process_escape_CSI(const char cmd, const std::string & parameters, const bool dec_private)
 {
 	std::optional<std::string> send_back;
 
@@ -887,6 +887,24 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 				y++;
 		}
 	}
+	else if (cmd == 'Y') {  // screen checksum
+		if (pars.size() != 6)
+			return { };
+		int pid  = std::stoi(pars[0]);
+		// int page = std::stoi(pars[1]);
+		int pt   = std::clamp(std::stoi(pars[2]) - 1, 0, h - 1);
+		int pl   = std::clamp(std::stoi(pars[3]) - 1, 0, w - 1);
+		int pb   = std::clamp(std::stoi(pars[2]) - 1, 0, h - 1);
+		int pr   = std::clamp(std::stoi(pars[3]) - 1, 0, w - 1);
+
+		uint16_t chksum = 0;
+		for(int y=pt; y<pb; y++) {
+			for(x=pl; x<pr; x++)
+				chksum -= screen[y * w + x].c;
+		}
+
+		send_back = myformat("\033P%d!~%04X\x9c", pid, chksum);
+	}
 	else if (cmd == 'P') {  // delete character
 		int n = evaluate_n(par1);
 		DLD("CSI P (%d)", n);
@@ -1059,8 +1077,10 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 				else if (escape_type == ET_DCS) {
 				}
 				else if (escape_type == ET_CSI) {
-					if (in[i] >= 0x40 && in[i] <= 0x7e) {
-						send_back = process_escape_CSI(in[i], escape_value);
+					if (in[i] == '"' || in[i] == '!' || in[i] == '*')
+						dec_private = true;
+					else if (in[i] >= 0x40 && in[i] <= 0x7e) {
+						send_back = process_escape_CSI(in[i], escape_value, dec_private);
 
 						escape = false;
 					}

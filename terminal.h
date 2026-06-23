@@ -50,6 +50,7 @@ private:
 	int               save_y { 0 };
 	escape_type_t     escape_type { ET_NONE };
 	std::string       escape_value;
+	bool              dec_private { false };
 	bool              escape      { false };
 	int               fg_col_ansi { 7 };
 	rgb_t             fg_rgb      { 255, 255, 255 };
@@ -112,7 +113,7 @@ public:
 	void do_next_line(const bool move_to_left, const bool do_scroll, const int n_lines);
 	void do_prev_line(const bool move_to_left, const bool do_scroll, const int n_lines);
 
-	std::optional<std::string> process_escape_CSI(const char cmd, const std::string & parameters);
+	std::optional<std::string> process_escape_CSI(const char cmd, const std::string & parameters, const bool dec_private);
 
 	std::optional<std::string> process_input(const char *const in, const size_t len);
 	std::optional<std::string> process_input(const std::string & in);
