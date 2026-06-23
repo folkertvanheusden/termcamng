@@ -18,8 +18,7 @@ void set_thread_name(std::string name)
 
 bool file_exists(const std::string & file, size_t *const file_size)
 {
-        struct stat st { 0 };
-
+        struct stat st { };
         bool rc = stat(file.c_str(), &st) == 0;
 
         if (rc && file_size)

@@ -26,9 +26,9 @@ int start_tcp_listen(const std::string & bind_to, const int listen_port)
 	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size))
 		error_exit(true, "start_tcp_listen: failed to enable TCP FastOpen");
 
-        struct sockaddr_in server_addr { 0 };
+        struct sockaddr_in server_addr { };
         server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(listen_port);
+        server_addr.sin_port   = htons(listen_port);
 	int rc = inet_pton(AF_INET, bind_to.c_str(), &server_addr.sin_addr);
 
 	if (rc == 0)
