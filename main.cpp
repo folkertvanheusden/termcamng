@@ -129,7 +129,7 @@ int function_conversation(int num_msg, const struct pam_message **msg, struct pa
 std::pair<bool, std::string> authenticate_against_pam(const std::string & username, const std::string & password)
 {
 	struct pam_response *reply = reinterpret_cast<pam_response *>(calloc(1, sizeof(struct pam_response)));
-	reply->resp = strdup(password.c_str());
+	reply->resp         = strdup(password.c_str());
 	reply->resp_retcode = 0;
 
 	const struct pam_conv local_conversation { function_conversation, reply };

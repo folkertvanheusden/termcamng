@@ -107,7 +107,7 @@ void get_html_root(const std::string url, net_io *const io, const void *const pa
 	io->send(reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 }
 
-void send_frame(net_io *const io, const std::string & mime_type, std::optional<std::tuple<uint8_t *, size_t, bool> > image)
+void send_frame(net_io *const io, const std::string & mime_type, const std::optional<std::tuple<uint8_t *, size_t, bool> > & image)
 {
 	if (image.has_value() == false) {
 		std::string reply =
