@@ -927,6 +927,13 @@ std::optional<std::string> terminal::process_escape_CSI(const char cmd, const st
 				h_tab_stops.at(x) = false;
 		}
 	}
+	else if (cmd == 't') {  // XTWINOPTS
+		DLD("CSI t");
+		if (par1.has_value()) {
+			if (par1.value() == 19 || par1.value() == 18)
+				send_back = myformat("\033[9;%d;%dt", h, w);
+		}
+	}
 	else {
 		DLD("CSI %c (???)", cmd);
 
