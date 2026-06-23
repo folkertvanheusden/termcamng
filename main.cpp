@@ -529,9 +529,11 @@ void read_and_distribute_program(const int program_fd, terminal *const t, client
 #ifdef LOG_TRAFFIC
 				{
 					FILE *fh = fopen("traffic.log", "a+");
-
 					if (fh) {
-						fprintf(fh, "%s", data.c_str());
+						fprintf(fh, "> %s\n", data.c_str());
+
+						if (send_back.has_value())
+							fprintf(fh, "< %s\n", send_back.value().c_str());
 
 						fclose(fh);
 					}
