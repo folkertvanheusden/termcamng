@@ -260,4 +260,8 @@ httpd * start_http_server(const std::string & bind_ip, const int http_port, http
 void stop_http_server(httpd *const h)
 {
 	delete h;
+
+	for(auto & item: cr)
+		delete item.second;
+	cr.clear();
 }
