@@ -979,9 +979,6 @@ std::optional<std::string> terminal::process_input(const char *const in, const s
 
 	try {
 		for(size_t i=0; i<len; i++) {
-			x = std::clamp(x, 0, w - 1);
-			y = std::clamp(y, 0, h - 1);
-
 			if (g0)
 				g0 = false;
 			// C0
