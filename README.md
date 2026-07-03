@@ -74,15 +74,13 @@ vlc
 demo
 ----
 
-http://vps001.vanheusden.com:8888/stream.mjpeg
+~~http://vps001.vanheusden.com:8888/stream.mjpeg
+~~or via https:
+~~https://vps001.vanheusden.com:4430/stream.mjpeg
+~~or via VNC:
+~~vps001.vanheusden.com port 5901
 
-or via https:
-
-https://vps001.vanheusden.com:4430/stream.mjpeg
-
-or via VNC:
-
-vps001.vanheusden.com port 5901
+https://webcam.nurd.space/stream.mjpeg?inst=terminal-stream
 
 
 notes
